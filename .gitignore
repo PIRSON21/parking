@@ -142,4 +142,7 @@ tags
 # Persistent undo
 [._]*.un~
 
+
+# Personal ignores for project 'parking'
 .idea/parking.iml
+logs/
