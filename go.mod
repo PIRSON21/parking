@@ -1,4 +1,4 @@
-module parking
+module github.com/PIRSON21/parking
 
 go 1.24
 
