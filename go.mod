@@ -2,7 +2,10 @@ module github.com/PIRSON21/parking
 
 go 1.24
 
-require github.com/ilyakaznacheev/cleanenv v1.5.0
+require (
+	github.com/ilyakaznacheev/cleanenv v1.5.0
+	github.com/lib/pq v1.10.9
+)
 
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect

@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"flag"
+	"github.com/PIRSON21/parking/internal/config"
+	"github.com/PIRSON21/parking/internal/storage/postgresql"
 	"log"
 	"log/slog"
 	"os"
-	"parking/internal/config"
 	"time"
 )
 
@@ -47,7 +48,10 @@ func main() {
 	log := mustCreateLogger(cfg.Environment, logFile)
 
 	log.Info("logger started successfully", slog.String("env", cfg.Environment))
-	// TODO: подключить БД
+	// подключение БД
+	db := postgresql.MustConnectDB(cfg)
+
+	_ = db // TODO: убрать
 
 	// TODO: установить роутер + выбрать пакет для websocket
 
@@ -79,16 +83,16 @@ func mustCreateLogger(env string, logFile *os.File) *slog.Logger {
 func mustCreateLogFile() *os.File {
 	err := os.Mkdir("logs/", os.ModeDir)
 	if errors.Is(err, os.ErrExist) {
-		log.Println("directory logs/ already exists")
+		log.Println("directory \"logs/\" already exists")
 	} else if err != nil {
-		log.Fatal(err)
+		log.Fatal("error while creating \"logs/\" directory: ", err)
 	}
 
 	fileName := time.Now().Format("02.01.2006 15.04.05")
 
 	logFile, err := os.Create("./logs/" + fileName + ".json")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("error while create log file "+fileName+": ", err)
 	}
 
 	return logFile

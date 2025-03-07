@@ -12,9 +12,9 @@ type Config struct {
 }
 
 type ConfigDB struct {
-	Name     string `env:"DB_NAME,required"`
-	Username string `env:"DB_USER,required"`
-	Password string `env:"DB_PASSWORD,required"`
+	DBName     string `env:"DB_NAME,required"`
+	DBUsername string `env:"DB_USER,required"`
+	DBPassword string `env:"DB_PASSWORD,required"`
 }
 
 // MustCreateConfig создает структуру конфига из файла, путь которого
