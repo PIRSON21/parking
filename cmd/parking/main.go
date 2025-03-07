@@ -3,10 +3,14 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/storage/postgresql"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 )
@@ -53,9 +57,34 @@ func main() {
 
 	_ = db // TODO: убрать
 
-	// TODO: установить роутер + выбрать пакет для websocket
+	// установка роутера chi
+	router := chi.NewRouter()
 
-	// TODO: запустить сервер
+	router.Use(middleware.RequestID)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Heartbeat("/ping"))
+	router.Use(middleware.RedirectSlashes)
+
+	router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "aboba")
+	})
+
+	// задание настроек сервера
+	srv := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  time.Duration(4),
+		WriteTimeout: time.Duration(4),
+		IdleTimeout:  time.Duration(60),
+	}
+
+	log.Info("server started", slog.String("addr", cfg.Address))
+
+	// запуск сервера
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("error while serving: ", slog.String("err", err.Error()))
+	}
 }
 
 // mustCreateLogger создает логер исходя из текущего окружения.
