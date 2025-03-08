@@ -1,4 +1,4 @@
-package handler
+package parking
 
 import (
 	"github.com/PIRSON21/parking/internal/config"
@@ -10,6 +10,7 @@ import (
 	"net/http"
 )
 
+//go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=ParkingGetter
 type ParkingGetter interface {
 	GetParkingsList(search string) ([]*models.Parking, error)
 }

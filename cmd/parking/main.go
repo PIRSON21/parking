@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"github.com/PIRSON21/parking/internal/config"
-	"github.com/PIRSON21/parking/internal/http-server/handler"
+	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/storage/postgresql"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -64,7 +64,7 @@ func main() {
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
 
-	router.Get("/", handler.AllParkingsHandler(log, db, cfg))
+	router.Get("/", parking.AllParkingsHandler(log, db, cfg))
 
 	// задание настроек сервера
 	srv := &http.Server{
