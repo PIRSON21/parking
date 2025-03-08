@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
+	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/storage/postgresql"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -55,35 +55,32 @@ func main() {
 	// подключение БД
 	db := postgresql.MustConnectDB(cfg)
 
-	_ = db // TODO: убрать
-
 	// установка роутера chi
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
+	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
-	router.Use(middleware.RealIP)
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
 
-	router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-		fmt.Fprint(writer, "aboba")
-	})
+	router.Get("/", parking.AllParkingsHandler(log, db, cfg))
 
 	// задание настроек сервера
 	srv := &http.Server{
 		Addr:         cfg.Address,
 		Handler:      router,
-		ReadTimeout:  time.Duration(4),
-		WriteTimeout: time.Duration(4),
-		IdleTimeout:  time.Duration(60),
+		ReadTimeout:  40 * time.Second,
+		WriteTimeout: 40 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Info("server started", slog.String("addr", cfg.Address))
+	log.Info("server started", slog.String("addr", srv.Addr))
 
 	// запуск сервера
 	if err := srv.ListenAndServe(); err != nil {
 		log.Error("error while serving: ", slog.String("err", err.Error()))
+		return
 	}
 }
 
