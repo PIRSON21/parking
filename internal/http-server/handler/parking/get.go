@@ -32,7 +32,7 @@ func AllParkingsHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *conf
 			log.Error("error while getting from DB",
 				slog.String("err", err.Error()))
 
-			errorHandler(w, r, cfg, err)
+			ErrorHandler(w, r, cfg, err)
 
 			return
 		}
@@ -44,17 +44,17 @@ func AllParkingsHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *conf
 		}
 
 		if err = render.RenderList(w, r, resp.NewParkingListRender(parkings)); err != nil {
-			errorHandler(w, r, cfg, err)
+			ErrorHandler(w, r, cfg, err)
 
 			return
 		}
 	}
 }
 
-// errorHandler обрабатывает серверную ошибку (не клиентскую).
+// ErrorHandler обрабатывает серверную ошибку (не клиентскую).
 // Если приложение находится не в проде, выведет ошибку пользователю.
 // Иначе, выведет стандартное сообщение "Internal Server Error".
-func errorHandler(w http.ResponseWriter, r *http.Request, cfg *config.Config, err error) {
+func ErrorHandler(w http.ResponseWriter, r *http.Request, cfg *config.Config, err error) {
 	if cfg.Environment != "prod" {
 		renderError(w, r, err)
 	} else {

@@ -78,3 +78,22 @@ func (s *Storage) GetParkingsList(search string) ([]*models.Parking, error) {
 
 	return resParking, nil
 }
+
+func (s *Storage) AddParking(parking *models.Parking) error {
+	const op = "storage.postgresql.AddParking"
+
+	stmt, err := s.db.Prepare(`
+		INSERT INTO parkings (parking_name, parking_address, parking_width, parking_height)
+		VALUES ($1, $2, $3, $4);
+	`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	_, err = stmt.Exec(parking.Name, parking.Address, parking.Width, parking.Height)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	return nil
+}
