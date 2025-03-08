@@ -65,6 +65,7 @@ func main() {
 	router.Use(middleware.RedirectSlashes)
 
 	router.Get("/", parking.AllParkingsHandler(log, db, cfg))
+	router.Post("/add_parking", parking.AddParkingHandler(log, db, cfg))
 
 	// задание настроек сервера
 	srv := &http.Server{

@@ -1,8 +1,10 @@
 package response
 
 import (
+	"fmt"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 	"net/http"
 )
 
@@ -51,4 +53,35 @@ func NewParkingListRender(parkings []*models.Parking) []render.Renderer {
 	}
 
 	return list
+}
+
+var validationErrorMessages = map[string]string{
+	"required": "Не указано поле",
+	"min":      "Минимальная длина поля %s",
+	"max":      "Максимальная длина поля %s",
+	"lte":      "Значение не может быть больше %s",
+	"gte":      "Значение не может быть меньше %s",
+}
+
+func ValidationError(validateErr validator.ValidationErrors) map[string]string {
+	fieldErrors := make(map[string]string)
+
+	for _, err := range validateErr {
+		field := err.Field()
+		tag := err.Tag()
+		param := err.Param()
+
+		var errMessage string
+		if param != "" {
+			errMessage = fmt.Sprintf(validationErrorMessages[tag], param)
+		} else {
+			errMessage = validationErrorMessages[tag]
+		}
+
+		if errMessage != "" {
+			fieldErrors[field] = errMessage
+		}
+	}
+
+	return fieldErrors
 }
