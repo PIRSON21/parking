@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking/mocks"
+	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/go-chi/chi/v5"
@@ -29,172 +29,183 @@ const (
 	urlAllParkings = "/parking"
 )
 
-func TestAllParkingsHandler_Success(t *testing.T) {
-	t.Parallel()
-	// Создаем мок для интерфейса ParkingGetter
-	mockParkingGetter := new(mocks.ParkingGetter)
-	mockParkingGetter.On("GetParkingsList", "").
-		Return([]*models.Parking{
-			{
-				ID:      1,
-				Name:    "1:Центр",
-				Address: "ул. Ленина, 10",
-				Width:   20,
-				Height:  50,
+func TestAllParkingsHandler(t *testing.T) {
+	cases := []struct {
+		Name             string
+		Search           string
+		ParkingsList     []*models.Parking
+		GetParkingsError error
+		RequestURL       string
+		ResponseCode     int
+		ResponseBody     string
+		JSON             bool
+		Environment      string
+	}{
+		{
+			Name:   "Success with one parking",
+			Search: "",
+			ParkingsList: []*models.Parking{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+				},
 			},
-			{
-				ID:      2,
-				Name:    "1:ТЦ",
-				Address: "ул. Ленина, 20",
-				Width:   18,
-				Height:  40,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+					URL:     "/parking/1",
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:   "Success with some parkings",
+			Search: "",
+			ParkingsList: []*models.Parking{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+				},
+				{
+					ID:      2,
+					Name:    "2: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   4,
+					Height:  4,
+				},
 			},
-		}, nil)
-
-	// Создаем HTTP-запрос
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, urlAllParkings, nil)
-	assert.NoError(t, err, "")
-
-	// Создаем ResponseRecorder (записывает ответ)
-	rr := httptest.NewRecorder()
-
-	// Создаем конфиг и логгер
-	log := slogdiscard.NewDiscardLogger()
-	cfg := &config.Config{
-		Environment: envLocal,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+					URL:     "/parking/1",
+				},
+				{
+					ID:      2,
+					Name:    "2: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   4,
+					Height:  4,
+					URL:     "/parking/2",
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:   "Success with search",
+			Search: "aboba",
+			ParkingsList: []*models.Parking{
+				{
+					ID:      1,
+					Name:    "1: aboba",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+				},
+			},
+			GetParkingsError: nil,
+			RequestURL:       fmt.Sprint(urlAllParkings + "?search=aboba"),
+			ResponseCode:     http.StatusOK,
+			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:      1,
+					Name:    "1: aboba",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+					URL:     "/parking/1",
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:             "Success empty list",
+			ParkingsList:     nil,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody:     "\"\"\n",
+			JSON:             false,
+		},
+		{
+			Name:             "Error while getting parks on dev",
+			Search:           "",
+			ParkingsList:     nil,
+			GetParkingsError: fmt.Errorf("parking getter error"),
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusInternalServerError,
+			ResponseBody:     fmt.Sprintf(expectedError, "parking getter error"),
+			JSON:             true,
+			Environment:      envLocal,
+		},
+		{
+			Name:             "Error while getting parks on prod",
+			Search:           "",
+			ParkingsList:     nil,
+			GetParkingsError: fmt.Errorf("parking getter error"),
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusInternalServerError,
+			ResponseBody:     internalServerErrorMessage,
+			JSON:             false,
+			Environment:      envProd,
+		},
 	}
 
-	// Вызываем обработчик
-	parking.AllParkingsHandler(log, mockParkingGetter, cfg).ServeHTTP(rr, req)
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			parkingGetterMock := mocks.NewParkingGetter(t)
+			parkingGetterMock.On("GetParkingsList", tc.Search).
+				Return(tc.ParkingsList, tc.GetParkingsError).
+				Once()
 
-	require.Equal(t, http.StatusOK, rr.Code)
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tc.RequestURL, nil)
+			require.NoError(t, err)
 
-	body := rr.Body.String()
+			rr := httptest.NewRecorder()
 
-	expectedJSON := `[{"id":1,"name":"1:Центр","address":"ул. Ленина, 10","height":50,"width":20,"url":"/parking/1"},{"id":2,"name":"1:ТЦ","address":"ул. Ленина, 20","height":40,"width":18,"url":"/parking/2"}]`
-	assert.JSONEq(t, expectedJSON, body)
-}
+			log := slogdiscard.NewDiscardLogger()
+			cfg := &config.Config{Environment: envLocal}
+			if tc.Environment != "" {
+				cfg.Environment = tc.Environment
+			}
 
-func TestAllParkingsHandler_SearchSuccess(t *testing.T) {
-	t.Parallel()
+			parking.AllParkingsHandler(log, parkingGetterMock, cfg).ServeHTTP(rr, req)
+			require.Equal(t, tc.ResponseCode, rr.Code)
 
-	parkingGetterMock := new(mocks.ParkingGetter)
-	parkingGetterMock.On("GetParkingsList", "центр абоба").
-		Return([]*models.Parking{
-			{
-				ID:      1,
-				Name:    "1:Центр",
-				Address: "ул. Ленина, 10",
-				Width:   20,
-				Height:  50,
-			},
-			{
-				ID:      2,
-				Name:    "1:Центр",
-				Address: "ул. Ленина, 20",
-				Width:   18,
-				Height:  40,
-			},
-		}, nil).
-		Once()
+			body := rr.Body.String()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/?search=центр абоба", nil)
-	require.NoError(t, err)
+			if tc.JSON {
+				assert.JSONEq(t, tc.ResponseBody, body)
 
-	rr := httptest.NewRecorder()
+				return
+			} else {
+				assert.Equal(t, tc.ResponseBody, body)
 
-	log := slogdiscard.NewDiscardLogger()
-	cfg := &config.Config{Environment: envLocal}
+				return
+			}
 
-	parking.AllParkingsHandler(log, parkingGetterMock, cfg).ServeHTTP(rr, req)
-	require.Equal(t, http.StatusOK, rr.Code)
-
-	body := rr.Body.String()
-
-	expectedJSON := `[{"id":1,"name":"1:Центр","address":"ул. Ленина, 10","height":50,"width":20,"url":"/parking/1"},{"id":2,"name":"1:Центр","address":"ул. Ленина, 20","height":40,"width":18,"url":"/parking/2"}]`
-
-	assert.JSONEq(t, expectedJSON, body)
-}
-
-func TestAllParkingsHandler_EmptyList(t *testing.T) {
-	t.Parallel()
-	// Создаем мок
-	parkingGetterMock := new(mocks.ParkingGetter)
-	parkingGetterMock.On("GetParkingsList", "Salam Aleykum").
-		Return([]*models.Parking{}, nil)
-
-	// Создаем request
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/?search=Salam Aleykum", nil)
-	require.NoError(t, err)
-
-	// Создаем конфиг и логгер
-	log := slogdiscard.NewDiscardLogger()
-	cfg := &config.Config{Environment: envLocal}
-
-	// Создаем тестовый сервер
-	rr := httptest.NewRecorder()
-
-	parking.AllParkingsHandler(log, parkingGetterMock, cfg).ServeHTTP(rr, req)
-	require.Equal(t, http.StatusOK, rr.Code)
-
-	body := rr.Body.String()
-
-	expectedJSON := `""`
-
-	assert.JSONEq(t, expectedJSON, body)
-}
-
-func TestAllParkingsHandler_ErrorDev(t *testing.T) {
-	t.Parallel()
-	// Создаем mock
-	parkingGetterMock := new(mocks.ParkingGetter)
-	parkingGetterMock.On("GetParkingsList", "").
-		Return(nil, errors.New("error test"))
-
-	// Создаем запрос
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, urlAllParkings, nil)
-	require.NoError(t, err)
-
-	// Создаем обработчика
-	rr := httptest.NewRecorder()
-
-	// Создаем cfg и log
-	log := slogdiscard.NewDiscardLogger()
-	cfg := &config.Config{Environment: envLocal}
-
-	// Запускаем обработчик
-	parking.AllParkingsHandler(log, parkingGetterMock, cfg).ServeHTTP(rr, req)
-	require.Equal(t, http.StatusInternalServerError, rr.Code)
-
-	body := rr.Body.String()
-
-	expectedJSON := `{"error": "error test"}`
-	assert.JSONEq(t, expectedJSON, body)
-}
-
-func TestAllParkingsHandler_ErrorProd(t *testing.T) {
-	t.Parallel()
-
-	parkingGetterMock := new(mocks.ParkingGetter)
-	parkingGetterMock.On("GetParkingsList", "").
-		Return(nil, errors.New("error test"))
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, urlAllParkings, nil)
-	require.NoError(t, err)
-
-	rr := httptest.NewRecorder()
-
-	log := slogdiscard.NewDiscardLogger()
-	cfg := &config.Config{Environment: envProd}
-
-	parking.AllParkingsHandler(log, parkingGetterMock, cfg).ServeHTTP(rr, req)
-	require.Equal(t, http.StatusInternalServerError, rr.Code)
-
-	body := rr.Body.String()
-
-	expectedBody := fmt.Sprintln("Internal Server Error")
-	assert.Equal(t, expectedBody, body)
-
+			assert.Fail(t, "прописаны не все проверки")
+		})
+	}
 }
 
 const (
@@ -446,4 +457,13 @@ func TestGetParkingHandler(t *testing.T) {
 			assert.Fail(t, "для этого кейса не предусмотрен тест")
 		})
 	}
+}
+
+func mustMarshalResponse(v interface{}) string {
+	var res []byte
+	res, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return string(res)
 }
