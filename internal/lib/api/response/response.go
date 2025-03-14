@@ -12,6 +12,10 @@ type Response struct {
 	Error string `json:"error,omitempty"`
 }
 
+type RespErrorList struct {
+	ErrorList []string `json:"error"`
+}
+
 // ParkingResponse - формат информации для response об одной парковке.
 type ParkingResponse struct {
 	ID      int    `json:"id"`
@@ -19,11 +23,32 @@ type ParkingResponse struct {
 	Address string `json:"address"`
 	Height  int    `json:"height"`
 	Width   int    `json:"width"`
+	URL     string `json:"url"`
 }
 
-func Error(errMessage string) Response {
-	return Response{
-		Error: errMessage,
+// UnknownError - ответ, возвращаемый без конкретного поля ошибки.
+func UnknownError(errMessage string) map[string]interface{} {
+	return map[string]interface{}{
+		"error": errMessage,
+	}
+}
+
+func Error(field string, err error) map[string]interface{} {
+	return map[string]interface{}{
+		field: err.Error(),
+	}
+}
+
+// ListError создает массив ошибок.
+func ListError(field string, errors []error) map[string]interface{} {
+	var errMessageList []string
+
+	for _, err := range errors {
+		errMessageList = append(errMessageList, err.Error())
+	}
+
+	return map[string]interface{}{
+		field: errMessageList,
 	}
 }
 
@@ -35,6 +60,7 @@ func NewParkingResponse(p *models.Parking) *ParkingResponse {
 		Address: p.Address,
 		Height:  p.Height,
 		Width:   p.Width,
+		URL:     fmt.Sprintf("/parking/%d", p.ID),
 	}
 }
 
@@ -55,6 +81,8 @@ func NewParkingListRender(parkings []*models.Parking) []render.Renderer {
 	return list
 }
 
+// validationErrorMessages нужна для получения стандартного сообщения ошибки
+// для тегов ошибок типа validator.ValidationErrors.
 var validationErrorMessages = map[string]string{
 	"required": "Не указано поле",
 	"min":      "Минимальная длина поля %s",
