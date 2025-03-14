@@ -12,6 +12,24 @@ type ParkingSetter struct {
 	mock.Mock
 }
 
+// AddCellsForParking provides a mock function with given fields: _a0, _a1
+func (_m *ParkingSetter) AddCellsForParking(_a0 *models.Parking, _a1 []*models.ParkingCellStruct) error {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddCellsForParking")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*models.Parking, []*models.ParkingCellStruct) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // AddParking provides a mock function with given fields: _a0
 func (_m *ParkingSetter) AddParking(_a0 *models.Parking) error {
 	ret := _m.Called(_a0)
