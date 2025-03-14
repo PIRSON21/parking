@@ -143,8 +143,8 @@ func TestAllParkingsHandler(t *testing.T) {
 			GetParkingsError: nil,
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusOK,
-			ResponseBody:     "\"\"\n",
-			JSON:             false,
+			ResponseBody:     "[]",
+			JSON:             true,
 		},
 		{
 			Name:             "Error while getting parks on dev",
