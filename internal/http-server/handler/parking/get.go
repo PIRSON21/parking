@@ -45,7 +45,7 @@ func AllParkingsHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *conf
 		}
 
 		if len(parkings) == 0 {
-			render.JSON(w, r, "")
+			render.JSON(w, r, []string{})
 
 			return
 		}
