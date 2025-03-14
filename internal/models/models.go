@@ -47,3 +47,10 @@ type ParkingCellStruct struct {
 	X, Y     int
 	CellType ParkingCell
 }
+
+type Manager struct {
+	ID       int
+	Login    string
+	Password string
+	Email    string
+}
