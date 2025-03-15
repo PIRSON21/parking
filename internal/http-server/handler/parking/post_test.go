@@ -3,12 +3,12 @@ package parking_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking/mocks"
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
+	"github.com/PIRSON21/parking/internal/lib/test"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,22 +19,11 @@ import (
 )
 
 const (
-	required         = "Не указано поле"
-	min              = "Минимальная длина поля %d"
-	max              = "Максимальная длина поля %d"
-	lte              = "Значение не может быть больше %d"
-	gte              = "Значение не может быть меньше %d"
 	cellsWidthWrong  = `"длина строки %d не соответствует длине топологии: %d"`
 	cellsHeightWrong = `"ширина парковки не соответствует ширине топологии: %d"`
 	cellsWrongCell   = `"клетка (%d,%d) недействительна: '%s'"`
 
 	urlAddParking = "/add_parking"
-
-	expectedErrors           = `{"error":[%s]}`
-	expectedValidationError  = `{%q:%q}`
-	expectedValidationErrors = `{%q:[%s]}`
-
-	internalServerErrorMessage = "Internal Server Error\n"
 )
 
 func TestAddParkingHandler(t *testing.T) {
@@ -54,7 +43,7 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        fmt.Sprintf(expectedError, "http-server.handler.parking.AddParkingHandler: error while decoding JSON: unexpected EOF"),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedError, "http-server.handler.parking.AddParkingHandler: error while decoding JSON: unexpected EOF"),
 			JSON:                    true,
 		},
 		{
@@ -63,13 +52,13 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        internalServerErrorMessage,
+			ExpectedResponse:        test.InternalServerErrorMessage,
 			JSON:                    false,
-			Environment:             envProd,
+			Environment:             test.EnvProd,
 		},
 		{
 			Name: "Success without cells",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -83,7 +72,7 @@ func TestAddParkingHandler(t *testing.T) {
 		},
 		{
 			Name: "Success with cells",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -104,7 +93,7 @@ func TestAddParkingHandler(t *testing.T) {
 		},
 		{
 			Name: "No name",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
 				Height:  5,
@@ -112,12 +101,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "name", required),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "name", test.Required),
 			JSON:                    true,
 		},
 		{
 			Name: "No address",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:   "1: Центр",
 				Width:  5,
 				Height: 5,
@@ -125,12 +114,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "address", required),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "address", test.Required),
 			JSON:                    true,
 		},
 		{
 			Name: "No width",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Height:  5,
@@ -138,12 +127,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "width", required),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "width", test.Required),
 			JSON:                    true,
 		},
 		{
 			Name: "No height",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -151,12 +140,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "height", required),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "height", test.Required),
 			JSON:                    true,
 		},
 		{
 			Name: "Name length under min",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "a",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -165,12 +154,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "name", fmt.Sprintf(min, 3)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "name", fmt.Sprintf(test.Min, 3)),
 			JSON:                    true,
 		},
 		{
 			Name: "Name length upper max",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -179,12 +168,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "name", fmt.Sprintf(max, 10)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "name", fmt.Sprintf(test.Max, 10)),
 			JSON:                    true,
 		},
 		{
 			Name: "Address length under min",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "a",
 				Width:   5,
@@ -193,12 +182,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "address", fmt.Sprintf(min, 10)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "address", fmt.Sprintf(test.Min, 10)),
 			JSON:                    true,
 		},
 		{
 			Name: "Address length upper max",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкинаaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Width:   5,
@@ -207,12 +196,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "address", fmt.Sprintf(max, 30)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "address", fmt.Sprintf(test.Max, 30)),
 			JSON:                    true,
 		},
 		{
 			Name: "Width value under min",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   1,
@@ -221,12 +210,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "width", fmt.Sprintf(gte, 4)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "width", fmt.Sprintf(test.Gte, 4)),
 			JSON:                    true,
 		},
 		{
 			Name: "Width value upper max",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   10,
@@ -235,12 +224,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "width", fmt.Sprintf(lte, 6)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "width", fmt.Sprintf(test.Lte, 6)),
 			JSON:                    true,
 		},
 		{
 			Name: "Height value under min",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -249,12 +238,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "height", fmt.Sprintf(gte, 4)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "height", fmt.Sprintf(test.Gte, 4)),
 			JSON:                    true,
 		},
 		{
 			Name: "Height value upper max",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -263,12 +252,12 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse:        fmt.Sprintf(expectedValidationError, "height", fmt.Sprintf(lte, 6)),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedValidationError, "height", fmt.Sprintf(test.Lte, 6)),
 			JSON:                    true,
 		},
 		{
 			Name: "Wrong parking width",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -284,13 +273,13 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse: fmt.Sprintf(expectedValidationErrors, "cells",
+			ExpectedResponse: fmt.Sprintf(test.ExpectedValidationErrors, "cells",
 				fmt.Sprintf(cellsWidthWrong, 0, 5)),
 			JSON: true,
 		},
 		{
 			Name: "Wrong parking height",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -307,13 +296,13 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse: fmt.Sprintf(expectedValidationErrors, "cells",
+			ExpectedResponse: fmt.Sprintf(test.ExpectedValidationErrors, "cells",
 				fmt.Sprintf(cellsHeightWrong, 5)),
 			JSON: true,
 		},
 		{
 			Name: "Wrong parking cell",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -329,13 +318,13 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusBadRequest,
-			ExpectedResponse: fmt.Sprintf(expectedValidationErrors, "cells",
+			ExpectedResponse: fmt.Sprintf(test.ExpectedValidationErrors, "cells",
 				fmt.Sprintf(cellsWrongCell, 4, 2, "H")),
 			JSON: true,
 		},
 		{
 			Name: "Internal addParking error on dev",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -344,13 +333,13 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         fmt.Errorf("test parking error"),
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        fmt.Sprintf(expectedError, "http-server.handler.parking.AddParkingHandler: error while saving Parking: test parking error"),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedError, "http-server.handler.parking.AddParkingHandler: error while saving Parking: test parking error"),
 			JSON:                    true,
-			Environment:             envLocal,
+			Environment:             test.EnvLocal,
 		},
 		{
 			Name: "Internal addParking error on prod",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -359,13 +348,13 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         fmt.Errorf("test parking error"),
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        internalServerErrorMessage,
+			ExpectedResponse:        test.InternalServerErrorMessage,
 			JSON:                    false,
-			Environment:             envProd,
+			Environment:             test.EnvProd,
 		},
 		{
 			Name: "Internal addCellsForParking error on dev",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -381,13 +370,13 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: fmt.Errorf("test parking error"),
 			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        fmt.Sprintf(expectedError, "http-server.handler.parking.AddParkingHandler: error while adding cells to DB: test parking error"),
+			ExpectedResponse:        fmt.Sprintf(test.ExpectedError, "http-server.handler.parking.AddParkingHandler: error while adding cells to DB: test parking error"),
 			JSON:                    true,
-			Environment:             envLocal,
+			Environment:             test.EnvLocal,
 		},
 		{
 			Name: "Internal addCellsForParking error on prod",
-			RequestBody: mustMarshal(models.Parking{
+			RequestBody: test.MustMarshal(models.Parking{
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
 				Width:   5,
@@ -403,9 +392,9 @@ func TestAddParkingHandler(t *testing.T) {
 			AddParkingError:         nil,
 			AddCellsForParkingError: fmt.Errorf("test parking error"),
 			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        internalServerErrorMessage,
+			ExpectedResponse:        test.InternalServerErrorMessage,
 			JSON:                    false,
-			Environment:             envProd,
+			Environment:             test.EnvProd,
 		},
 	}
 
@@ -430,7 +419,7 @@ func TestAddParkingHandler(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			log := slogdiscard.NewDiscardLogger()
-			cfg := &config.Config{Environment: envLocal}
+			cfg := &config.Config{Environment: test.EnvLocal}
 
 			if tc.Environment != "" {
 				cfg.Environment = tc.Environment
@@ -455,12 +444,4 @@ func TestAddParkingHandler(t *testing.T) {
 		})
 	}
 
-}
-
-func mustMarshal(v interface{}) []byte {
-	data, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return data
 }

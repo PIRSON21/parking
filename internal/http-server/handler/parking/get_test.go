@@ -10,6 +10,7 @@ import (
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking/mocks"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
+	"github.com/PIRSON21/parking/internal/lib/test"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,10 +23,6 @@ import (
 )
 
 const (
-	envLocal = "local"
-	envDev   = "dev"
-	envProd  = "prod"
-
 	urlAllParkings = "/parking"
 )
 
@@ -153,9 +150,9 @@ func TestAllParkingsHandler(t *testing.T) {
 			GetParkingsError: fmt.Errorf("parking getter error"),
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusInternalServerError,
-			ResponseBody:     fmt.Sprintf(expectedError, "parking getter error"),
+			ResponseBody:     fmt.Sprintf(test.ExpectedError, "parking getter error"),
 			JSON:             true,
-			Environment:      envLocal,
+			Environment:      test.EnvLocal,
 		},
 		{
 			Name:             "Error while getting parks on prod",
@@ -164,9 +161,9 @@ func TestAllParkingsHandler(t *testing.T) {
 			GetParkingsError: fmt.Errorf("parking getter error"),
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusInternalServerError,
-			ResponseBody:     internalServerErrorMessage,
+			ResponseBody:     test.InternalServerErrorMessage,
 			JSON:             false,
-			Environment:      envProd,
+			Environment:      test.EnvProd,
 		},
 	}
 
@@ -183,7 +180,7 @@ func TestAllParkingsHandler(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			log := slogdiscard.NewDiscardLogger()
-			cfg := &config.Config{Environment: envLocal}
+			cfg := &config.Config{Environment: test.EnvLocal}
 			if tc.Environment != "" {
 				cfg.Environment = tc.Environment
 			}
@@ -211,7 +208,6 @@ func TestAllParkingsHandler(t *testing.T) {
 const (
 	expectedJSONWithoutCells = `{"id":%d,"name":%q,"address":%q,"width":%d,"height":%d}`
 	expectedJSONWithCells    = `{"id":%d,"name":%q,"address":%q,"width":%d,"height":%d,"cells":%s}`
-	expectedError            = `{"error":%q}`
 
 	urlCurrentParking = "/parking/%d"
 )
@@ -318,7 +314,7 @@ func TestGetParkingHandler(t *testing.T) {
 			GetParkingError: fmt.Errorf("db: error getting from DB"),
 			GetCellsError:   nil,
 			WithCells:       false,
-			Environment:     envProd,
+			Environment:     test.EnvProd,
 			JSON:            false,
 		},
 		{
@@ -360,7 +356,7 @@ func TestGetParkingHandler(t *testing.T) {
 			GetParkingError: nil,
 			GetCellsError:   fmt.Errorf("cells: error while getting cells"),
 			WithCells:       false,
-			Environment:     envProd,
+			Environment:     test.EnvProd,
 			JSON:            false,
 		},
 	}
@@ -400,7 +396,7 @@ func TestGetParkingHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			log := slogdiscard.NewDiscardLogger()
-			cfg := &config.Config{Environment: envLocal}
+			cfg := &config.Config{Environment: test.EnvLocal}
 			if tc.Environment != "" {
 				// Если указан специфичный Environment
 				cfg.Environment = tc.Environment
@@ -431,11 +427,11 @@ func TestGetParkingHandler(t *testing.T) {
 			}
 
 			if tc.GetParkingError != nil {
-				expectedResponse = fmt.Sprintf(expectedError, tc.GetParkingError.Error())
+				expectedResponse = fmt.Sprintf(test.ExpectedError, tc.GetParkingError.Error())
 			}
 
 			if tc.GetCellsError != nil {
-				expectedResponse = fmt.Sprintf(expectedError, tc.GetCellsError.Error())
+				expectedResponse = fmt.Sprintf(test.ExpectedError, tc.GetCellsError.Error())
 			}
 
 			if tc.JSON {
