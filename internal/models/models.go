@@ -43,14 +43,16 @@ func (c *ParkingCell) IsRoad() bool {
 	return strings.EqualFold(string(*c), string(Road))
 }
 
+// ParkingCellStruct используется для получения/сохранения данных о клетках парковки в БД
 type ParkingCellStruct struct {
 	X, Y     int
 	CellType ParkingCell
 }
 
-type Manager struct {
+// User отражает поля пользователей
+type User struct {
 	ID       int
-	Login    string
-	Password string
-	Email    string
+	Login    string `json:"login" validate:"required,min=4,max=8"`
+	Password string `json:"password" validate:"required,min=4,max=10"`
+	Email    string `json:"email,omitempty" validate:"omitempty,email,min=8,max=15"`
 }
