@@ -313,7 +313,10 @@ func (s *Storage) SetSessionID(userID int, sessionID string) error {
 
 	if userID != 0 {
 		queryID.Int64 = int64(userID)
+		queryID.Valid = true
 	}
+
+	fmt.Println(queryID)
 
 	stmt, err := s.db.Prepare(`
 	INSERT INTO user_session(session_id, user_id, deadline)
