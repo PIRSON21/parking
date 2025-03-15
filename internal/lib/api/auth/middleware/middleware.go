@@ -12,6 +12,8 @@ type AuthGetter interface {
 
 type contextKey string
 
+// UserIDKey - ключ для получения userID.
+// Используется отдельный тип contextKey, чтобы значение не перекрывалось другими middleware.
 var UserIDKey contextKey = "userID"
 
 // AuthMiddleware проверяет session_id из cookie клиента на актуальность и достоверность.
