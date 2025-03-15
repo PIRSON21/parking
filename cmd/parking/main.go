@@ -5,6 +5,8 @@ import (
 	"flag"
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
+	"github.com/PIRSON21/parking/internal/http-server/handler/user"
+	authMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	"github.com/PIRSON21/parking/internal/storage/postgresql"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -65,9 +67,17 @@ func main() {
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
 
-	router.Get("/parking", parking.AllParkingsHandler(log, db, cfg))
-	router.Get("/parking/{id}", parking.GetParkingHandler(log, db, cfg))
-	router.Post("/add_parking", parking.AddParkingHandler(log, db, cfg))
+	// TODO: доделать
+	router.Group(func(public chi.Router) {
+		public.Post("/login", user.LoginHandler(log, db, cfg))
+	})
+
+	router.Group(func(private chi.Router) {
+		private.Use(authMiddleware.AuthMiddleware(db))
+		private.Get("/parking", parking.AllParkingsHandler(log, db, cfg))
+		private.Get("/parking/{id}", parking.GetParkingHandler(log, db, cfg))
+		private.Post("/add_parking", parking.AddParkingHandler(log, db, cfg))
+	})
 
 	// задание настроек сервера
 	srv := &http.Server{
@@ -126,3 +136,5 @@ func mustCreateLogFile() *os.File {
 
 	return logFile
 }
+
+// TODO: посмотреть ещё раз код, написать тесты для логина, добавить endpoint для создание менеджера

@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
+	customValidator "github.com/PIRSON21/parking/internal/lib/validator"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"log/slog"
 	"net/http"
-	"reflect"
-	"strings"
 )
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=ParkingSetter
@@ -40,12 +39,12 @@ func AddParkingHandler(log *slog.Logger, storage ParkingSetter, cfg *config.Conf
 		if err != nil {
 			log.Error("error while decoding JSON", slog.String("err", err.Error()))
 
-			ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while decoding JSON: %w", op, err))
+			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while decoding JSON: %w", op, err))
 
 			return
 		}
 
-		valid := CreateNewValidator()
+		valid := customValidator.CreateNewValidator()
 
 		// валидируем данные
 		if err = valid.Struct(&parking); err != nil {
@@ -62,7 +61,7 @@ func AddParkingHandler(log *slog.Logger, storage ParkingSetter, cfg *config.Conf
 		if err != nil {
 			log.Error("error while adding Parking to DB", slog.String("err", err.Error()))
 
-			ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while saving Parking: %w", op, err))
+			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while saving Parking: %w", op, err))
 
 			return
 		}
@@ -84,7 +83,7 @@ func AddParkingHandler(log *slog.Logger, storage ParkingSetter, cfg *config.Conf
 			if err != nil {
 				log.Error("error while adding cells to DB", slog.String("err", err.Error()))
 
-				ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while adding cells to DB: %w", op, err))
+				resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while adding cells to DB: %w", op, err))
 
 				return
 			}
@@ -92,20 +91,6 @@ func AddParkingHandler(log *slog.Logger, storage ParkingSetter, cfg *config.Conf
 
 		w.WriteHeader(http.StatusNoContent)
 	}
-}
-
-func CreateNewValidator() *validator.Validate {
-	valid := validator.New()
-
-	valid.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
-		if name == "-" {
-			return ""
-		}
-		return name
-	})
-
-	return valid
 }
 
 // createParkingCells проверяет клетки парковки на соответствие требованиям.

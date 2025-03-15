@@ -2,6 +2,7 @@ package response
 
 import (
 	"fmt"
+	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
@@ -89,6 +90,7 @@ var validationErrorMessages = map[string]string{
 	"max":      "Максимальная длина поля %s",
 	"lte":      "Значение не может быть больше %s",
 	"gte":      "Значение не может быть меньше %s",
+	"email":    "Введенное значение не email",
 }
 
 func ValidationError(validateErr validator.ValidationErrors) map[string]string {
@@ -112,4 +114,26 @@ func ValidationError(validateErr validator.ValidationErrors) map[string]string {
 	}
 
 	return fieldErrors
+}
+
+// ErrorHandler обрабатывает серверную ошибку (не клиентскую).
+// Если приложение находится не в проде, выведет ошибку пользователю.
+// Иначе, выведет стандартное сообщение "Internal Server UnknownError".
+func ErrorHandler(w http.ResponseWriter, r *http.Request, cfg *config.Config, err error) {
+	if cfg.Environment != "prod" {
+		renderError(w, r, err)
+	} else {
+		internalError(w)
+	}
+}
+
+// internalError возвращает ошибку сервера без дополнительной информации для пользователя.
+func internalError(w http.ResponseWriter) {
+	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+}
+
+// renderError предоставляет текст ошибки пользователя. Используется в версии для разработки.
+func renderError(w http.ResponseWriter, r *http.Request, err error) {
+	render.Status(r, http.StatusInternalServerError)
+	render.JSON(w, r, UnknownError(err.Error()))
 }

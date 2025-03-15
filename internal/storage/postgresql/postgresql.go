@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/models"
+	"golang.org/x/crypto/bcrypt"
 	"log"
 	"strings"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -229,6 +231,103 @@ func (s *Storage) AddCellsForParking(parking *models.Parking, cells []*models.Pa
 	_, err := s.db.Exec(query, valueArgs...)
 	if err != nil {
 		return fmt.Errorf("%s: error while executing query: %w", op, err)
+	}
+
+	return nil
+}
+
+// GetUserID получает и проверяет актуальность сессии, и возвращает id пользователя.
+// Если id > 0, то пользователь - менеджер. Если id = 0, пользователь - администратор.
+// id = -1, сессия пользователя истекла или не найдена.
+func (s *Storage) GetUserID(sessionID string) (int, error) {
+	const op = "storage.postgresql.GetUserID"
+
+	stmt, err := s.db.Prepare(`
+	SELECT user_id, deadline 
+	FROM user_session 
+	WHERE session_id = $1;
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	var userID sql.NullInt64
+	var deadline time.Time
+
+	err = stmt.QueryRow(sessionID).Scan(&userID, &deadline)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return -1, nil
+		}
+
+		return 0, fmt.Errorf("%s: error while getting row: %w", op, err)
+	}
+	if time.Now().After(deadline) {
+		return -1, nil
+	}
+
+	if userID.Valid {
+		return int(userID.Int64), nil
+	} else {
+		return 0, nil
+	}
+}
+
+// AuthenticateManager проверяет введенный логин и пароль на достоверность.
+func (s *Storage) AuthenticateManager(user *models.User) (int, error) {
+	const op = "storage.postgresql.AuthenticateManager"
+
+	var hashedPassword string
+	var managerID int
+
+	stmt, err := s.db.Prepare(`SELECT manager_id, manager_password FROM manager WHERE manager_login = $1;`)
+	if err != nil {
+
+		return 0, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	err = stmt.QueryRow(user.Login).Scan(&managerID, &hashedPassword)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return -1, nil
+		}
+		return 0, fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	if !checkPassword(user.Password, hashedPassword) {
+		return -1, nil
+	}
+
+	return managerID, nil
+}
+
+func checkPassword(inputPassword, hashedPassword string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(inputPassword))
+	return err == nil
+}
+
+// SetSessionID добавляет в БД информацию о сессии.
+func (s *Storage) SetSessionID(userID int, sessionID string) error {
+	const op = "storage.postgresql.SetSessionID"
+	var queryID sql.NullInt64
+
+	if userID != 0 {
+		queryID.Int64 = int64(userID)
+	}
+
+	stmt, err := s.db.Prepare(`
+	INSERT INTO user_session(session_id, user_id, deadline)
+	VALUES ($1, $2, $3);
+	`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	deadline := time.Now().Add(72 * time.Hour)
+
+	_, err = stmt.Exec(sessionID, queryID, deadline)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	return nil
