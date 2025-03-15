@@ -39,7 +39,7 @@ func AllParkingsHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *conf
 			log.Error("error while getting from DB",
 				slog.String("err", err.Error()))
 
-			ErrorHandler(w, r, cfg, err)
+			resp.ErrorHandler(w, r, cfg, err)
 
 			return
 		}
@@ -51,7 +51,7 @@ func AllParkingsHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *conf
 		}
 
 		if err = render.RenderList(w, r, resp.NewParkingListRender(parkings)); err != nil {
-			ErrorHandler(w, r, cfg, err)
+			resp.ErrorHandler(w, r, cfg, err)
 
 			return
 		}
@@ -94,7 +94,7 @@ func GetParkingHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *confi
 
 			log.Error("error while getting Parking from DB", slog.String("err", err.Error()))
 
-			ErrorHandler(w, r, cfg, err)
+			resp.ErrorHandler(w, r, cfg, err)
 
 			return
 		}
@@ -103,33 +103,11 @@ func GetParkingHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *confi
 		if err != nil {
 			log.Error("error while getting cells from DB", slog.String("err", err.Error()))
 
-			ErrorHandler(w, r, cfg, err)
+			resp.ErrorHandler(w, r, cfg, err)
 
 			return
 		}
 
 		render.JSON(w, r, parking)
 	}
-}
-
-// ErrorHandler обрабатывает серверную ошибку (не клиентскую).
-// Если приложение находится не в проде, выведет ошибку пользователю.
-// Иначе, выведет стандартное сообщение "Internal Server UnknownError".
-func ErrorHandler(w http.ResponseWriter, r *http.Request, cfg *config.Config, err error) {
-	if cfg.Environment != "prod" {
-		renderError(w, r, err)
-	} else {
-		internalError(w)
-	}
-}
-
-// internalError возвращает ошибку сервера без дополнительной информации для пользователя.
-func internalError(w http.ResponseWriter) {
-	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-}
-
-// renderError предоставляет текст ошибки пользователя. Используется в версии для разработки.
-func renderError(w http.ResponseWriter, r *http.Request, err error) {
-	render.Status(r, http.StatusInternalServerError)
-	render.JSON(w, r, resp.UnknownError(err.Error()))
 }
