@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
+	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"log"
@@ -238,7 +239,7 @@ func (s *Storage) AddCellsForParking(parking *models.Parking, cells []*models.Pa
 
 // GetUserID получает и проверяет актуальность сессии, и возвращает id пользователя.
 // Если id > 0, то пользователь - менеджер. Если id = 0, пользователь - администратор.
-// id = -1, сессия пользователя истекла или не найдена.
+// Если сессия истекла или не найдена, выведется ошибка ErrUnauthorized.
 func (s *Storage) GetUserID(sessionID string) (int, error) {
 	const op = "storage.postgresql.GetUserID"
 
@@ -257,13 +258,14 @@ func (s *Storage) GetUserID(sessionID string) (int, error) {
 	err = stmt.QueryRow(sessionID).Scan(&userID, &deadline)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return -1, nil
+			return 0, custErr.ErrUnauthorized
 		}
 
 		return 0, fmt.Errorf("%s: error while getting row: %w", op, err)
 	}
+
 	if time.Now().After(deadline) {
-		return -1, nil
+		return 0, custErr.ErrSessionExpired
 	}
 
 	if userID.Valid {
@@ -289,13 +291,13 @@ func (s *Storage) AuthenticateManager(user *models.User) (int, error) {
 	err = stmt.QueryRow(user.Login).Scan(&managerID, &hashedPassword)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return -1, nil
+			return 0, custErr.ErrUnauthorized
 		}
 		return 0, fmt.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	if !checkPassword(user.Password, hashedPassword) {
-		return -1, nil
+		return 0, custErr.ErrUnauthorized
 	}
 
 	return managerID, nil
@@ -313,7 +315,10 @@ func (s *Storage) SetSessionID(userID int, sessionID string) error {
 
 	if userID != 0 {
 		queryID.Int64 = int64(userID)
+		queryID.Valid = true
 	}
+
+	fmt.Println(queryID)
 
 	stmt, err := s.db.Prepare(`
 	INSERT INTO user_session(session_id, user_id, deadline)
