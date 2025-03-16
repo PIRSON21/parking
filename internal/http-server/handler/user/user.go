@@ -138,6 +138,7 @@ func setSessionCookie(w http.ResponseWriter, sessionID string) {
 	http.SetCookie(w, &cookie)
 }
 
+//go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=UserSetter
 type UserSetter interface {
 	CreateNewManager(*models.User) error
 }
