@@ -7,6 +7,7 @@ import (
 	"github.com/PIRSON21/parking/internal/config"
 	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/models"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"strings"
@@ -202,7 +203,6 @@ func (s *Storage) GetParkingCells(parking *models.Parking) ([][]models.ParkingCe
 
 	return parkingCells, nil
 
-	// TODO: короче, нужно сделать тесты, вроде все готово. может комменты ещё, хз
 }
 
 // AddCellsForParking добавляет информацию о клетках топологии парковки.
@@ -336,4 +336,46 @@ func (s *Storage) SetSessionID(userID int, sessionID string) error {
 	}
 
 	return nil
+}
+
+// CreateNewManager создает нового менеджера в БД.
+// Возвращает только ошибку.
+func (s *Storage) CreateNewManager(manager *models.User) error {
+	const op = "storage.postgresql.CreateNewManager"
+
+	stmt, err := s.db.Prepare(`
+	INSERT INTO manager(manager_login, manager_password, manager_email)
+	VALUES ($1, $2, $3);
+	`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	hashedPassword, err := createPasswordHash(manager.Password)
+	if err != nil {
+		return fmt.Errorf("%s: error while creating password hash: %w", op, err)
+	}
+
+	_, err = stmt.Exec(manager.Login, hashedPassword, manager.Email)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				return pgErr
+			}
+		}
+
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	return nil
+}
+
+func createPasswordHash(password string) (string, error) {
+	pass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	return string(pass), nil
 }

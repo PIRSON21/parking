@@ -67,7 +67,6 @@ func main() {
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
 
-	// TODO: доделать
 	router.Group(func(public chi.Router) {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
 	})
@@ -78,6 +77,7 @@ func main() {
 		admin.Get("/parking", parking.AllParkingsHandler(log, db, cfg))
 		admin.Get("/parking/{id}", parking.GetParkingHandler(log, db, cfg))
 		admin.Post("/add_parking", parking.AddParkingHandler(log, db, cfg))
+		admin.Post("/create_manager", user.CreateManagerHandler(log, db, cfg))
 	})
 
 	// задание настроек сервера
@@ -137,5 +137,3 @@ func mustCreateLogFile() *os.File {
 
 	return logFile
 }
-
-// TODO: посмотреть ещё раз код, написать тесты для логина, добавить endpoint для создание менеджера
