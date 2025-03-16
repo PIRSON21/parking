@@ -203,7 +203,6 @@ func (s *Storage) GetParkingCells(parking *models.Parking) ([][]models.ParkingCe
 
 	return parkingCells, nil
 
-	// TODO: короче, нужно сделать тесты, вроде все готово. может комменты ещё, хз
 }
 
 // AddCellsForParking добавляет информацию о клетках топологии парковки.

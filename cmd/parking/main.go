@@ -67,7 +67,6 @@ func main() {
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
 
-	// TODO: доделать
 	router.Group(func(public chi.Router) {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
 	})
@@ -138,5 +137,3 @@ func mustCreateLogFile() *os.File {
 
 	return logFile
 }
-
-// TODO: посмотреть ещё раз код, написать тесты для логина, добавить endpoint для создание менеджера
