@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	"github.com/PIRSON21/parking/internal/lib/api/auth/middleware/mocks"
+	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/lib/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +14,8 @@ import (
 )
 
 const (
-	expectedUnauthorizedError = "Unauthorized\n"
+	expectedUnauthorizedError   = "Unauthorized\n"
+	expectedExpiredSessionError = "Session Expired\n"
 )
 
 func TestAuthMiddleware(t *testing.T) {
@@ -74,14 +76,26 @@ func TestAuthMiddleware(t *testing.T) {
 		{
 			Name:           "No session on DB",
 			SessionID:      "aboba",
-			UserID:         -1,
-			GetUserIDError: nil,
+			UserID:         0,
+			GetUserIDError: custErr.ErrUnauthorized,
 			Cookie: &http.Cookie{
 				Name:  "session_id",
 				Value: "aboba",
 			},
 			ResponseCode: http.StatusUnauthorized,
 			ResponseBody: expectedUnauthorizedError,
+		},
+		{
+			Name:           "Expired session on DB",
+			SessionID:      "aboba",
+			UserID:         0,
+			GetUserIDError: custErr.ErrSessionExpired,
+			Cookie: &http.Cookie{
+				Name:  "session_id",
+				Value: "aboba",
+			},
+			ResponseCode: http.StatusForbidden,
+			ResponseBody: expectedExpiredSessionError,
 		},
 		{
 			Name:           "Internal error",

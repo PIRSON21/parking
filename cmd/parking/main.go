@@ -72,11 +72,12 @@ func main() {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
 	})
 
-	router.Group(func(private chi.Router) {
-		private.Use(authMiddleware.AuthMiddleware(db))
-		private.Get("/parking", parking.AllParkingsHandler(log, db, cfg))
-		private.Get("/parking/{id}", parking.GetParkingHandler(log, db, cfg))
-		private.Post("/add_parking", parking.AddParkingHandler(log, db, cfg))
+	router.Group(func(admin chi.Router) {
+		admin.Use(authMiddleware.AuthMiddleware(db))
+		admin.Use(authMiddleware.AdminMiddleware)
+		admin.Get("/parking", parking.AllParkingsHandler(log, db, cfg))
+		admin.Get("/parking/{id}", parking.GetParkingHandler(log, db, cfg))
+		admin.Post("/add_parking", parking.AddParkingHandler(log, db, cfg))
 	})
 
 	// задание настроек сервера
