@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
+	"github.com/PIRSON21/parking/internal/lib/api/request"
 	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -340,7 +341,7 @@ func (s *Storage) SetSessionID(userID int, sessionID string) error {
 
 // CreateNewManager создает нового менеджера в БД.
 // Возвращает только ошибку.
-func (s *Storage) CreateNewManager(manager *models.User) error {
+func (s *Storage) CreateNewManager(manager *request.UserCreate) error {
 	const op = "storage.postgresql.CreateNewManager"
 
 	stmt, err := s.db.Prepare(`

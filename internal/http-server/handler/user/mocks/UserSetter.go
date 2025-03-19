@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	models "github.com/PIRSON21/parking/internal/models"
+	request "github.com/PIRSON21/parking/internal/lib/api/request"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,7 +13,7 @@ type UserSetter struct {
 }
 
 // CreateNewManager provides a mock function with given fields: _a0
-func (_m *UserSetter) CreateNewManager(_a0 *models.User) error {
+func (_m *UserSetter) CreateNewManager(_a0 *request.UserCreate) error {
 	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
@@ -21,7 +21,7 @@ func (_m *UserSetter) CreateNewManager(_a0 *models.User) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*models.User) error); ok {
+	if rf, ok := ret.Get(0).(func(*request.UserCreate) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)

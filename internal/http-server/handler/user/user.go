@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
+	"github.com/PIRSON21/parking/internal/lib/api/request"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	customErr "github.com/PIRSON21/parking/internal/lib/errors"
 	customValidator "github.com/PIRSON21/parking/internal/lib/validator"
@@ -36,8 +37,8 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 			slog.String("requestID", middleware.GetReqID(r.Context())),
 		)
 
-		var user models.User
-		err := render.DecodeJSON(r.Body, &user)
+		userReq := new(request.UserLogin)
+		err := render.DecodeJSON(r.Body, userReq)
 		if err != nil {
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.UnknownError(fmt.Sprintf("error while decoding JSON: %s", err.Error())))
@@ -47,7 +48,7 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 
 		valid := customValidator.CreateNewValidator()
 
-		if err = valid.Struct(&user); err != nil {
+		if err = valid.Struct(userReq); err != nil {
 			validateErr := err.(validator.ValidationErrors)
 
 			render.Status(r, http.StatusBadRequest)
@@ -56,11 +57,9 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 			return
 		}
 
-		fmt.Println(user)
-
 		// проверка на администратора. По условиям задачи, администратор должен иметь один единственный аккаунт,
 		// которые встроен в коде программы
-		if user.Login == "admin" && user.Password == "admin" {
+		if userReq.Login == "admin" && userReq.Password == "admin" {
 			err = returnSessionID(w, 0, db)
 			if err != nil {
 				log.Error("err while returning session ID", slog.String("err", err.Error()))
@@ -73,8 +72,13 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 			return
 		}
 
+		user := &models.User{
+			Login:    userReq.Login,
+			Password: userReq.Password,
+		}
+
 		// проверка введенных данных менеджера
-		user.ID, err = db.AuthenticateManager(&user)
+		user.ID, err = db.AuthenticateManager(user)
 		if err != nil {
 			// в случае, если логин и пароль не найдены или неправильны
 			if errors.Is(err, customErr.ErrUnauthorized) {
@@ -140,7 +144,7 @@ func setSessionCookie(w http.ResponseWriter, sessionID string) {
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=UserSetter
 type UserSetter interface {
-	CreateNewManager(*models.User) error
+	CreateNewManager(*request.UserCreate) error
 }
 
 // CreateManagerHandler обрабатывает запрос на создание менеджера
@@ -153,7 +157,7 @@ func CreateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 			slog.String("reqID", middleware.GetReqID(r.Context())),
 		)
 
-		newManager := new(models.User)
+		newManager := new(request.UserCreate)
 		if err := render.DecodeJSON(r.Body, newManager); err != nil {
 			log.Error("error while decoding JSON", slog.String("err", err.Error()))
 
