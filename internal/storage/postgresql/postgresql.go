@@ -42,21 +42,41 @@ func MustConnectDB(cfg *config.Config) *Storage {
 	return &Storage{db}
 }
 
-// GetParkingsList обращается в БД и получает список всех парковок (+ поиск по имени).
-func (s *Storage) GetParkingsList(search string) ([]*models.Parking, error) {
-	const op = "storage.postgresql.GetParkingsList"
-
-	stmt, err := s.db.Prepare(`
+// GetAdminParkings получает из БД данные о всех парковках по запросу search.
+func (s *Storage) GetAdminParkings(search string) ([]*models.Parking, error) {
+	query := `
 			SELECT 
 			    parking_id, parking_name, parking_address, parking_width, parking_height 
 			FROM parkings
-			WHERE parking_name ILIKE $1 ;
-    `)
+			WHERE parking_name ILIKE $1
+    `
+	search = "%" + search + "%"
+	return s.fetchParkings(query, search)
+}
+
+// GetManagerParkings получает из БД данные о всех доступных менеджеру парковках по запросу search.
+func (s *Storage) GetManagerParkings(userID int, search string) ([]*models.Parking, error) {
+	query := `
+			SELECT 
+			    parking_id, parking_name, parking_address, parking_width, parking_height 
+			FROM parkings
+			WHERE parking_name ILIKE $1 AND manager_id = $2
+    `
+	search = "%" + search + "%"
+
+	return s.fetchParkings(query, search, userID)
+}
+
+// fetchParkings исполняет запросы и структурирует данные.
+func (s *Storage) fetchParkings(query string, args ...interface{}) ([]*models.Parking, error) {
+	const op = "storage.postgresql.fetchParkings"
+
+	stmt, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, fmt.Errorf("%s: error while prepare statement: %w", op, err)
 	}
 
-	rows, err := stmt.Query("%" + search + "%")
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
