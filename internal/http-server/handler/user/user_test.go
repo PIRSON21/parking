@@ -306,23 +306,23 @@ func TestCreateManagerHandler(t *testing.T) {
 			JSON:         true,
 			ResponseBody: fmt.Sprintf(test.ExpectedValidationError, "password", test.Required),
 		},
-		//{
-		//	Name:                  "No email",
-		//	CreateNewManagerError: nil,
-		//	RequestBody: test.MustMarshal(&models.User{
-		//		Password: "aboba",
-		//		Login:    "aboba",
-		//	}),
-		//	ResponseCode: http.StatusBadRequest,
-		//	JSON:         true,
-		//	ResponseBody: fmt.Sprintf(test.ExpectedValidationError, "email", test.Required),
-		//},
-		// TODO: не работает сейчас
+		{
+			Name:                  "No email",
+			CreateNewManagerError: nil,
+			RequestBody: test.MustMarshal(&models.User{
+				Password: "aboba",
+				Login:    "aboba",
+			}),
+			ResponseCode: http.StatusBadRequest,
+			JSON:         true,
+			ResponseBody: fmt.Sprintf(test.ExpectedValidationError, "email", test.Required),
+		},
 		{
 			Name: "Login smaller min",
 			RequestBody: test.MustMarshal(&models.User{
 				Login:    "a",
 				Password: "aboba",
+				Email:    "aboba@mail.ru",
 			}),
 			CreateNewManagerError: nil,
 			ResponseCode:          http.StatusBadRequest,
@@ -334,6 +334,7 @@ func TestCreateManagerHandler(t *testing.T) {
 			RequestBody: test.MustMarshal(&models.User{
 				Login:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Password: "aboba",
+				Email:    "aboba@mail.ru",
 			}),
 			CreateNewManagerError: nil,
 			ResponseCode:          http.StatusBadRequest,
@@ -345,6 +346,7 @@ func TestCreateManagerHandler(t *testing.T) {
 			RequestBody: test.MustMarshal(&models.User{
 				Login:    "aboba",
 				Password: "a",
+				Email:    "aboba@mail.ru",
 			}),
 			CreateNewManagerError: nil,
 			ResponseCode:          http.StatusBadRequest,
@@ -356,6 +358,7 @@ func TestCreateManagerHandler(t *testing.T) {
 			RequestBody: test.MustMarshal(&models.User{
 				Login:    "aboba",
 				Password: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Email:    "aboba@mail.ru",
 			}),
 			CreateNewManagerError: nil,
 			ResponseCode:          http.StatusBadRequest,
@@ -444,7 +447,7 @@ func TestCreateManagerHandler(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			userSetterMock := mocks.NewUserSetter(t)
-			userSetterMock.On("CreateNewManager", mock.AnythingOfType("*models.User")).
+			userSetterMock.On("CreateNewManager", mock.AnythingOfType("*request.UserCreate")).
 				Return(tc.CreateNewManagerError).
 				Maybe()
 
