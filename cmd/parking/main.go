@@ -87,7 +87,7 @@ func main() {
 	router.Group(func(admin chi.Router) {
 		admin.Use(authMiddleware.AuthMiddleware(db))
 		admin.Use(authMiddleware.AdminMiddleware)
-		admin.Route("/parking", func(r chi.Router) {
+		admin.Route("/parking/", func(r chi.Router) {
 			r.Get("/{id}", parking.GetParkingHandler(log, db, cfg))
 			r.Post("/add", parking.AddParkingHandler(log, db, cfg))
 		})
