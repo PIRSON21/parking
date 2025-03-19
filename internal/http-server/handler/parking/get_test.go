@@ -8,6 +8,7 @@ import (
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking/mocks"
+	authMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
 	"github.com/PIRSON21/parking/internal/lib/test"
@@ -29,6 +30,7 @@ const (
 func TestAllParkingsHandler(t *testing.T) {
 	cases := []struct {
 		Name             string
+		UserID           int
 		Search           string
 		ParkingsList     []*models.Parking
 		GetParkingsError error
@@ -39,7 +41,7 @@ func TestAllParkingsHandler(t *testing.T) {
 		Environment      string
 	}{
 		{
-			Name:   "Success with one parking",
+			Name:   "Success with one parking as admin",
 			Search: "",
 			ParkingsList: []*models.Parking{
 				{
@@ -66,7 +68,35 @@ func TestAllParkingsHandler(t *testing.T) {
 			JSON: true,
 		},
 		{
-			Name:   "Success with some parkings",
+			Name:   "Success with one parking as manager",
+			Search: "",
+			ParkingsList: []*models.Parking{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+				},
+			},
+			UserID:           1,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+					URL:     "/parking/1",
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:   "Success with some parkings as admin",
 			Search: "",
 			ParkingsList: []*models.Parking{
 				{
@@ -108,7 +138,50 @@ func TestAllParkingsHandler(t *testing.T) {
 			JSON: true,
 		},
 		{
-			Name:   "Success with search",
+			Name:   "Success with some parkings as manager",
+			Search: "",
+			ParkingsList: []*models.Parking{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+				},
+				{
+					ID:      2,
+					Name:    "2: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   4,
+					Height:  4,
+				},
+			},
+			UserID:           1,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:      1,
+					Name:    "1: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+					URL:     "/parking/1",
+				},
+				{
+					ID:      2,
+					Name:    "2: Центр",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   4,
+					Height:  4,
+					URL:     "/parking/2",
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:   "Success with search as admin",
 			Search: "aboba",
 			ParkingsList: []*models.Parking{
 				{
@@ -135,8 +208,46 @@ func TestAllParkingsHandler(t *testing.T) {
 			JSON: true,
 		},
 		{
-			Name:             "Success empty list",
+			Name:   "Success with search as manager",
+			Search: "aboba",
+			ParkingsList: []*models.Parking{
+				{
+					ID:      1,
+					Name:    "1: aboba",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+				},
+			},
+			UserID:           1,
+			GetParkingsError: nil,
+			RequestURL:       fmt.Sprint(urlAllParkings + "?search=aboba"),
+			ResponseCode:     http.StatusOK,
+			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:      1,
+					Name:    "1: aboba",
+					Address: "ул. Пушкина, д. Колотушкина",
+					Width:   5,
+					Height:  5,
+					URL:     "/parking/1",
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:             "Success empty list as admin",
 			ParkingsList:     nil,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody:     "[]",
+			JSON:             true,
+		},
+		{
+			Name:             "Success empty list as manager",
+			ParkingsList:     nil,
+			UserID:           1,
 			GetParkingsError: nil,
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusOK,
@@ -170,11 +281,17 @@ func TestAllParkingsHandler(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			parkingGetterMock := mocks.NewParkingGetter(t)
-			parkingGetterMock.On("GetParkingsList", tc.Search).
-				Return(tc.ParkingsList, tc.GetParkingsError).
-				Once()
 
-			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tc.RequestURL, nil)
+			parkingGetterMock.On("GetAdminParkings", tc.Search).
+				Return(tc.ParkingsList, tc.GetParkingsError).
+				Maybe()
+
+			parkingGetterMock.On("GetManagerParkings", tc.UserID, tc.Search).
+				Return(tc.ParkingsList, tc.GetParkingsError).
+				Maybe()
+
+			newCtx := context.WithValue(context.Background(), authMiddleware.UserIDKey, tc.UserID)
+			req, err := http.NewRequestWithContext(newCtx, http.MethodGet, tc.RequestURL, nil)
 			require.NoError(t, err)
 
 			rr := httptest.NewRecorder()
