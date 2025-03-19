@@ -12,6 +12,66 @@ type ParkingGetter struct {
 	mock.Mock
 }
 
+// GetAdminParkings provides a mock function with given fields: search
+func (_m *ParkingGetter) GetAdminParkings(search string) ([]*models.Parking, error) {
+	ret := _m.Called(search)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAdminParkings")
+	}
+
+	var r0 []*models.Parking
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) ([]*models.Parking, error)); ok {
+		return rf(search)
+	}
+	if rf, ok := ret.Get(0).(func(string) []*models.Parking); ok {
+		r0 = rf(search)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.Parking)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(search)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetManagerParkings provides a mock function with given fields: userID, search
+func (_m *ParkingGetter) GetManagerParkings(userID int, search string) ([]*models.Parking, error) {
+	ret := _m.Called(userID, search)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetManagerParkings")
+	}
+
+	var r0 []*models.Parking
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int, string) ([]*models.Parking, error)); ok {
+		return rf(userID, search)
+	}
+	if rf, ok := ret.Get(0).(func(int, string) []*models.Parking); ok {
+		r0 = rf(userID, search)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.Parking)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int, string) error); ok {
+		r1 = rf(userID, search)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetParkingByID provides a mock function with given fields: parkingID
 func (_m *ParkingGetter) GetParkingByID(parkingID int) (*models.Parking, error) {
 	ret := _m.Called(parkingID)
@@ -65,36 +125,6 @@ func (_m *ParkingGetter) GetParkingCells(_a0 *models.Parking) ([][]models.Parkin
 
 	if rf, ok := ret.Get(1).(func(*models.Parking) error); ok {
 		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetParkingsList provides a mock function with given fields: search
-func (_m *ParkingGetter) GetParkingsList(search string) ([]*models.Parking, error) {
-	ret := _m.Called(search)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetParkingsList")
-	}
-
-	var r0 []*models.Parking
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]*models.Parking, error)); ok {
-		return rf(search)
-	}
-	if rf, ok := ret.Get(0).(func(string) []*models.Parking); ok {
-		r0 = rf(search)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*models.Parking)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(search)
 	} else {
 		r1 = ret.Error(1)
 	}

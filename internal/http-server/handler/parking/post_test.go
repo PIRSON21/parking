@@ -23,7 +23,7 @@ const (
 	cellsHeightWrong = `"ширина парковки не соответствует ширине топологии: %d"`
 	cellsWrongCell   = `"клетка (%d,%d) недействительна: '%s'"`
 
-	urlAddParking = "/add_parking"
+	urlAddParking = "/parking/add"
 )
 
 func TestAddParkingHandler(t *testing.T) {

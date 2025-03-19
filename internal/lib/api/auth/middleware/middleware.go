@@ -71,22 +71,20 @@ func AdminMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func ManagerMiddleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userIDVal := r.Context().Value(UserIDKey)
-			if userID, ok := userIDVal.(int); ok {
-				if userID == 0 {
-					http.Error(w, "Access denied", http.StatusForbidden)
-					return
-				}
-
-				next.ServeHTTP(w, r)
-
+func ManagerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userIDVal := r.Context().Value(UserIDKey)
+		if userID, ok := userIDVal.(int); ok {
+			if userID == 0 {
+				http.Error(w, "Access denied", http.StatusForbidden)
 				return
 			}
 
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		})
-	}
+			next.ServeHTTP(w, r)
+
+			return
+		}
+
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	})
 }
