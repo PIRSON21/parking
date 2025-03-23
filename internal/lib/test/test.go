@@ -27,4 +27,6 @@ const (
 	ExpectedValidationErrors = `{%q:[%s]}`
 
 	InternalServerErrorMessage = "Internal Server Error\n"
+
+	NotFound = "404 page not found\n"
 )
