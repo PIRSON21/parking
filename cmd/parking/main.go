@@ -73,24 +73,21 @@ func main() {
 
 	router.Group(func(user chi.Router) {
 		user.Use(authMiddleware.AuthMiddleware(db))
-		user.Get("/parking", parking.AllParkingsHandler(log, db, cfg))
+		user.Route("/parking", func(r chi.Router) {
+			r.Get("/", parking.AllParkingsHandler(log, db, cfg))
+			r.Get("/{id}", parking.GetParkingHandler(log, db, cfg))
+		})
 	})
 
 	router.Group(func(manager chi.Router) {
 		manager.Use(authMiddleware.AuthMiddleware(db))
 		manager.Use(authMiddleware.ManagerMiddleware)
-		manager.Get("/test", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusSeeOther)
-		})
 	})
 
 	router.Group(func(admin chi.Router) {
 		admin.Use(authMiddleware.AuthMiddleware(db))
 		admin.Use(authMiddleware.AdminMiddleware)
-		admin.Route("/parking/", func(r chi.Router) {
-			r.Get("/{id}", parking.GetParkingHandler(log, db, cfg))
-			r.Post("/add", parking.AddParkingHandler(log, db, cfg))
-		})
+		admin.Post("/parking/add", parking.AddParkingHandler(log, db, cfg))
 		admin.Post("/create_manager", user.CreateManagerHandler(log, db, cfg))
 	})
 

@@ -325,6 +325,7 @@ func TestAllParkingsHandler(t *testing.T) {
 const (
 	expectedJSONWithoutCells = `{"id":%d,"name":%q,"address":%q,"width":%d,"height":%d}`
 	expectedJSONWithCells    = `{"id":%d,"name":%q,"address":%q,"width":%d,"height":%d,"cells":%s}`
+	expectedJSONWith
 
 	urlCurrentParking = "/parking/%d"
 )
@@ -348,13 +349,15 @@ func TestGetParkingHandler(t *testing.T) {
 		GetParkingError error
 		// GetCellsError - ожидаемая ошибка от метода GetParkingCells. Может быть nil
 		GetCellsError error
-		// WithCells - ожидать JSON ответ с клетками или без
-		WithCells bool
 		// JSON - ожидать JSON ответ или нет
 		// (при серверных ошибках на проде и при 404 ответ не JSON)
 		JSON bool
 		// Environment - значение из cfg. Для проверки ответов на проде и деве
 		Environment string
+		// UserID - id пользователя, который будет передан в контекст. 0 - админ, > 0 - менеджера
+		UserID int
+		// ResponseBody - тело ответа
+		ResponseBody string
 	}{
 		{
 			Name: "Success With Cells",
@@ -382,8 +385,28 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusOK,
 			GetParkingError: nil,
 			GetCellsError:   nil,
-			WithCells:       true,
-			JSON:            true,
+			ResponseBody: mustMarshalResponse(&models.Parking{
+				ID:      1,
+				Name:    "1: Центр",
+				Address: "ул. Пушкина, д. Колотушкина",
+				Width:   4,
+				Height:  4,
+				Cells: [][]models.ParkingCell{
+					{
+						"P", "P", "P", "P",
+					},
+					{
+						".", ".", ".", ".",
+					},
+					{
+						"P", "P", ".", ".",
+					},
+					{
+						"P", "O", "I", "P",
+					},
+				},
+			}),
+			JSON: true,
 		},
 		{
 			Name: "Success without cells",
@@ -398,8 +421,15 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusOK,
 			GetParkingError: nil,
 			GetCellsError:   nil,
-			WithCells:       false,
-			JSON:            true,
+			ResponseBody: mustMarshalResponse(&models.Parking{
+				ID:      2,
+				Name:    "1: Центр",
+				Address: "ул. Пушкина, д. Колотушкина",
+				Width:   4,
+				Height:  4,
+				Cells:   nil,
+			}),
+			JSON: true,
 		},
 		{
 			Name: "Error while getting from DB on Dev",
@@ -414,7 +444,7 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusInternalServerError,
 			GetParkingError: fmt.Errorf("db: error getting from DB"),
 			GetCellsError:   nil,
-			WithCells:       false,
+			ResponseBody:    fmt.Sprintf(test.ExpectedError, "db: error getting from DB"),
 			JSON:            true,
 		},
 		{
@@ -430,8 +460,8 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusInternalServerError,
 			GetParkingError: fmt.Errorf("db: error getting from DB"),
 			GetCellsError:   nil,
-			WithCells:       false,
 			Environment:     test.EnvProd,
+			ResponseBody:    test.InternalServerErrorMessage,
 			JSON:            false,
 		},
 		{
@@ -440,7 +470,7 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusNotFound,
 			GetParkingError: sql.ErrNoRows,
 			GetCellsError:   nil,
-			WithCells:       false,
+			ResponseBody:    test.NotFound,
 			JSON:            false,
 		},
 		{
@@ -456,7 +486,7 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusInternalServerError,
 			GetParkingError: nil,
 			GetCellsError:   fmt.Errorf("cells: error while getting cells"),
-			WithCells:       false,
+			ResponseBody:    fmt.Sprintf(test.ExpectedError, "cells: error while getting cells"),
 			JSON:            true,
 		},
 		{
@@ -472,9 +502,78 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusInternalServerError,
 			GetParkingError: nil,
 			GetCellsError:   fmt.Errorf("cells: error while getting cells"),
-			WithCells:       false,
 			Environment:     test.EnvProd,
+			ResponseBody:    test.InternalServerErrorMessage,
 			JSON:            false,
+		},
+		{
+			Name: "Success get parking with manager to manager",
+			Parking: &models.Parking{
+				ID:      2,
+				Name:    "1: Центр",
+				Address: "ул. Пушкина, д. Колотушкина",
+				Width:   4,
+				Height:  4,
+				Cells:   nil,
+				Manager: &models.Manager{ID: 1},
+			},
+			ResponseCode:    http.StatusOK,
+			GetParkingError: nil,
+			GetCellsError:   nil,
+			JSON:            true,
+			ResponseBody: mustMarshalResponse(&models.Parking{
+				ID:      2,
+				Name:    "1: Центр",
+				Address: "ул. Пушкина, д. Колотушкина",
+				Width:   4,
+				Height:  4,
+				Cells:   nil,
+			}),
+			UserID: 1,
+		},
+		{
+			Name: "Success get parking with manager to admin",
+			Parking: &models.Parking{
+				ID:      2,
+				Name:    "1: Центр",
+				Address: "ул. Пушкина, д. Колотушкина",
+				Width:   4,
+				Height:  4,
+				Cells:   nil,
+				Manager: &models.Manager{ID: 1},
+			},
+			ResponseCode:    http.StatusOK,
+			GetParkingError: nil,
+			GetCellsError:   nil,
+			JSON:            true,
+			ResponseBody: mustMarshalResponse(&models.Parking{
+				ID:      2,
+				Name:    "1: Центр",
+				Address: "ул. Пушкина, д. Колотушкина",
+				Width:   4,
+				Height:  4,
+				Cells:   nil,
+				Manager: &models.Manager{ID: 1},
+			}),
+			UserID: 0,
+		},
+		{
+			Name: "Success not allowed parking for manager",
+			Parking: &models.Parking{
+				ID:      2,
+				Name:    "1: Центр",
+				Address: "ул. Пушкина, д. Колотушкина",
+				Width:   4,
+				Height:  4,
+				Cells:   nil,
+				Manager: &models.Manager{ID: 2},
+			},
+			ResponseCode:    http.StatusNotFound,
+			GetParkingError: nil,
+			GetCellsError:   nil,
+			JSON:            false,
+			ResponseBody:    test.NotFound,
+			UserID:          1,
 		},
 	}
 
@@ -493,6 +592,7 @@ func TestGetParkingHandler(t *testing.T) {
 						Address: tc.Parking.Address,
 						Width:   tc.Parking.Width,
 						Height:  tc.Parking.Height,
+						Manager: tc.Parking.Manager,
 					}, tc.GetParkingError).
 					Once()
 			} else {
@@ -509,7 +609,8 @@ func TestGetParkingHandler(t *testing.T) {
 
 			requestURL := fmt.Sprintf(urlCurrentParking, tc.Parking.ID)
 
-			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, requestURL, nil)
+			ctx := context.WithValue(context.Background(), authMiddleware.UserIDKey, tc.UserID)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 			require.NoError(t, err)
 
 			log := slogdiscard.NewDiscardLogger()
@@ -530,41 +631,12 @@ func TestGetParkingHandler(t *testing.T) {
 
 			body := rr.Body.String()
 
-			var expectedResponse string
-
-			if tc.GetParkingError == nil && tc.GetCellsError == nil {
-				if tc.WithCells {
-					fmt.Println(tc.Parking.Cells)
-					cells, err := json.Marshal(tc.Parking.Cells)
-					require.NoError(t, err)
-					expectedResponse = fmt.Sprintf(expectedJSONWithCells, tc.Parking.ID, tc.Parking.Name, tc.Parking.Address, tc.Parking.Width, tc.Parking.Height, cells)
-				} else {
-					expectedResponse = fmt.Sprintf(expectedJSONWithoutCells, tc.Parking.ID, tc.Parking.Name, tc.Parking.Address, tc.Parking.Width, tc.Parking.Height)
-				}
-			}
-
-			if tc.GetParkingError != nil {
-				expectedResponse = fmt.Sprintf(test.ExpectedError, tc.GetParkingError.Error())
-			}
-
-			if tc.GetCellsError != nil {
-				expectedResponse = fmt.Sprintf(test.ExpectedError, tc.GetCellsError.Error())
-			}
-
 			if tc.JSON {
-				assert.JSONEq(t, expectedResponse, body)
-
+				assert.JSONEq(t, tc.ResponseBody, body)
 				return
 			} else {
-				if tc.ResponseCode == http.StatusInternalServerError {
-					assert.Equal(t, "Internal Server Error\n", body)
-
-					return
-				} else if tc.ResponseCode == http.StatusNotFound {
-					assert.Equal(t, "404 page not found\n", body)
-
-					return
-				}
+				assert.Equal(t, tc.ResponseBody, body)
+				return
 			}
 
 			assert.Fail(t, "для этого кейса не предусмотрен тест")

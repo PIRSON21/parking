@@ -134,7 +134,7 @@ func (s *Storage) GetParkingByID(parkingID int) (*models.Parking, error) {
 
 	stmt, err := s.db.Prepare(`
 	SELECT 
-	    parking_id, parking_name, parking_address, parking_width, parking_height
+	    parking_id, parking_name, parking_address, parking_width, parking_height, manager_id
 	FROM parkings
 	WHERE parking_id = $1;
 `)
@@ -143,7 +143,8 @@ func (s *Storage) GetParkingByID(parkingID int) (*models.Parking, error) {
 	}
 
 	var parking models.Parking
-	if err = stmt.QueryRow(parkingID).Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height); err != nil {
+	var managerID sql.NullInt64
+	if err = stmt.QueryRow(parkingID).Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &managerID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -151,7 +152,9 @@ func (s *Storage) GetParkingByID(parkingID int) (*models.Parking, error) {
 		return nil, fmt.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
-	fmt.Printf("%s: parking: %v\n", op, parking)
+	if managerID.Valid {
+		parking.Manager = &models.Manager{ID: int(managerID.Int64)}
+	}
 
 	return &parking, nil
 }

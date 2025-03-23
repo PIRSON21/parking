@@ -115,6 +115,8 @@ func handleAdminParkings(log *slog.Logger, parkingGetter ParkingGetter, cfg *con
 }
 
 // GetParkingHandler обрабатывает запрос подробной информации о парковке по его ID.
+//
+//goland:noinspection ALL
 func GetParkingHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "http-server.handler.Parking.GetParkingHandler"
@@ -124,19 +126,10 @@ func GetParkingHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *confi
 			slog.String("reqID", middleware.GetReqID(r.Context())),
 		)
 
-		idStr := chi.URLParam(r, "id")
-		if idStr == "" {
-			render.Status(r, http.StatusBadRequest)
-			render.JSON(w, r, resp.UnknownError("не указан id парковки"))
-
-			return
-		}
-
-		id, err := strconv.Atoi(idStr)
+		id, err := getParkingID(r)
 		if err != nil {
-			render.Status(r, http.StatusBadRequest)
-			render.JSON(w, r, resp.UnknownError(fmt.Sprintf("id парковки %v не может быть преобразовано в число", idStr)))
-
+			log.Error("error while getting ID from url", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while getting ID from url: %w", op, err))
 			return
 		}
 
@@ -144,15 +137,21 @@ func GetParkingHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *confi
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				http.NotFound(w, r)
-
 				return
 			}
-
 			log.Error("error while getting Parking from DB", slog.String("err", err.Error()))
-
 			resp.ErrorHandler(w, r, cfg, err)
-
 			return
+		}
+
+		userID := getUserID(r)
+		if userID == -1 || (userID != 0 && userID != parking.Manager.ID) {
+			http.NotFound(w, r)
+			return
+		} else if userID == 0 {
+			// ничего не менять
+		} else {
+			parking.Manager = nil
 		}
 
 		parking.Cells, err = parkingGetter.GetParkingCells(parking)
@@ -166,4 +165,27 @@ func GetParkingHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *confi
 
 		render.JSON(w, r, parking)
 	}
+}
+
+// getUserID получает userID о пользователе, полученные из middleware.
+func getUserID(r *http.Request) int {
+	userIDStr := r.Context().Value(authMiddleware.UserIDKey)
+	if userID, ok := userIDStr.(int); ok {
+		return userID
+	}
+	return -1
+}
+
+// getParkingID получает ID о парковке из url и проверяет его.
+func getParkingID(r *http.Request) (int, error) {
+	idStr := chi.URLParam(r, "id")
+	if idStr == "" {
+		return 0, fmt.Errorf("не указан id парковки")
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return 0, fmt.Errorf("id парковки %v не может быть преобразовано в число", idStr)
+	}
+	return id, err
 }
