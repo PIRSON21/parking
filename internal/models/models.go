@@ -10,6 +10,11 @@ type Parking struct {
 	Width   int             `json:"width" validate:"required,gte=4,lte=6"`
 	Height  int             `json:"height" validate:"required,gte=4,lte=6"`
 	Cells   [][]ParkingCell `json:"cells,omitempty"`
+	Manager *Manager        `json:"manager,omitempty"`
+}
+
+type Manager struct {
+	ID int `json:"id"`
 }
 
 // ParkingCell - строка, которая хранит в себе информацию о клетки парковки
