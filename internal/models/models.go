@@ -1,6 +1,8 @@
 package models
 
-import "strings"
+import (
+	"strings"
+)
 
 // Parking - данные о парковке.
 type Parking struct {
@@ -46,6 +48,14 @@ func (c *ParkingCell) IsParkingCell() bool {
 // IsRoad проверяет, является ли текущая клетка - дорогой.
 func (c *ParkingCell) IsRoad() bool {
 	return strings.EqualFold(string(*c), string(Road))
+}
+
+func (c *ParkingCell) IsParking() bool {
+	return strings.EqualFold(string(*c), string(Park))
+}
+
+func (c *ParkingCell) IsEntrance() bool {
+	return *c == Entrance
 }
 
 // ParkingCellStruct используется для получения/сохранения данных о клетках парковки в БД
