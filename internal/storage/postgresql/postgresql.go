@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
+	"github.com/PIRSON21/parking/internal/http-server/handler/user"
 	"github.com/PIRSON21/parking/internal/lib/api/request"
 	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/models"
@@ -402,4 +403,136 @@ func createPasswordHash(password string) (string, error) {
 	}
 
 	return string(pass), nil
+}
+
+func (s *Storage) GetManagers() ([]*models.User, error) {
+	const op = "storage.postgresql.GetManagers"
+
+	stmt, err := s.db.Prepare(`
+	SELECT manager_id, manager_login, manager_email
+	FROM manager `)
+	if err != nil {
+		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	rows, err := stmt.Query()
+	defer rows.Close()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("%s: error while getting rows: %w", op, err)
+	}
+
+	var managers []*models.User
+
+	for rows.Next() {
+		manager := new(models.User)
+		err = rows.Scan(&manager.ID, &manager.Login, &manager.Email)
+		if err != nil {
+			return nil, fmt.Errorf("%s: error while reading rows: %w", op, err)
+		}
+		managers = append(managers, manager)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("%s: error with rows: %w", op, err)
+	}
+
+	return managers, nil
+}
+
+func (s *Storage) GetManagerByID(managerID int) (*models.User, error) {
+	const op = "storage.postgresql.GetManagerByID"
+
+	stmt, err := s.db.Prepare(`
+	SELECT manager_id, manager_login, manager_email
+	FROM manager
+	WHERE manager_id = $1
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	var manager models.User
+
+	if err := stmt.QueryRow(managerID).Scan(&manager.ID, &manager.Login, &manager.Email); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("%s: error while reading rows: %w", op, err)
+	}
+
+	return &manager, nil
+}
+
+// UpdateManager обновляет данные о менеджере в БД.
+func (s *Storage) UpdateManager(manager *user.UserPatch) error {
+	const op = "storage.postgresql.UpdateManager"
+
+	query := "UPDATE manager SET "
+	var updates []string
+	var args []interface{}
+	argIdx := 1
+
+	if manager.Login != nil {
+		updates = append(updates, fmt.Sprintf("manager_login = $%d", argIdx))
+		args = append(args, manager.Login)
+		argIdx++
+	}
+
+	if manager.Email != nil {
+		updates = append(updates, fmt.Sprintf("manager_email = $%d", argIdx))
+		args = append(args, manager.Email)
+		argIdx++
+	}
+
+	if manager.Password != nil {
+		updates = append(updates, fmt.Sprintf("manager_password = $%d", argIdx))
+		hashedPassword, err := createPasswordHash(*manager.Password)
+		if err != nil {
+			return fmt.Errorf("%s: error while hashing password: %w", op, err)
+		}
+		args = append(args, hashedPassword)
+		argIdx++
+	}
+
+	query += strings.Join(updates, ", ") + fmt.Sprintf(" WHERE manager_id = $%d", argIdx)
+	args = append(args, manager.ID)
+	fmt.Println(query, args)
+
+	_, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	return nil
+}
+
+// DeleteManager удаляет менеджера из БД.
+func (s *Storage) DeleteManager(managerID int) error {
+	const op = "storage.postgresql.DeleteManager"
+
+	stmt, err := s.db.Prepare(`DELETE FROM manager WHERE manager_id = $1`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	_, err = stmt.Exec(managerID)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	stmt, err = s.db.Prepare(`DELETE FROM user_session WHERE user_id = $1`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	_, err = stmt.Exec(managerID)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	return nil
 }

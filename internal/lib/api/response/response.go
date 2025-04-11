@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -179,4 +180,35 @@ func internalError(w http.ResponseWriter) {
 func renderError(w http.ResponseWriter, r *http.Request, err error) {
 	render.Status(r, http.StatusInternalServerError)
 	render.JSON(w, r, UnknownError(err.Error()))
+}
+
+type ManagerResponse struct {
+	ID    int    `json:"manager_id"`
+	Login string `json:"manager_login"`
+	Email string `json:"manager_email"`
+	URL   string `json:"manager_url"`
+}
+
+func NewManagerResponse(manager *models.User) *ManagerResponse {
+	return &ManagerResponse{
+		ID:    manager.ID,
+		Login: manager.Login,
+		Email: manager.Email,
+		URL:   "/manager/" + strconv.Itoa(manager.ID),
+	}
+}
+
+func (*ManagerResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func NewManagerListRender(managers []*models.User) []render.Renderer {
+	var res []render.Renderer
+
+	for _, manager := range managers {
+		resp := NewManagerResponse(manager)
+		res = append(res, resp)
+	}
+
+	return res
 }

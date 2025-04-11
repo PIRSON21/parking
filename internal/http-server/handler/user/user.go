@@ -9,6 +9,7 @@ import (
 	customErr "github.com/PIRSON21/parking/internal/lib/errors"
 	customValidator "github.com/PIRSON21/parking/internal/lib/validator"
 	"github.com/PIRSON21/parking/internal/models"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
@@ -16,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -23,6 +25,8 @@ import (
 type UserGetter interface {
 	AuthenticateManager(manager *models.User) (int, error)
 	SetSessionID(userID int, sessionID string) error
+	GetManagers() ([]*models.User, error)
+	GetManagerByID(id int) (*models.User, error)
 }
 
 // LoginHandler обрабатывает авторизацию пользователя.
@@ -32,7 +36,7 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "http-server.handler.user.LoginHandler"
 
-		log.With(
+		log = log.With(
 			slog.String("op", op),
 			slog.String("requestID", middleware.GetReqID(r.Context())),
 		)
@@ -145,6 +149,9 @@ func setSessionCookie(w http.ResponseWriter, sessionID string) {
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=UserSetter
 type UserSetter interface {
 	CreateNewManager(*request.UserCreate) error
+	UpdateManager(*UserPatch) error
+	GetManagerByID(int) (*models.User, error)
+	DeleteManager(int) error
 }
 
 // CreateManagerHandler обрабатывает запрос на создание менеджера
@@ -152,7 +159,7 @@ func CreateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "http-server.handler.user.CreateManagerHandler"
 
-		log.With(
+		log = log.With(
 			slog.String("op", op),
 			slog.String("reqID", middleware.GetReqID(r.Context())),
 		)
@@ -194,5 +201,160 @@ func CreateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 		}
 
 		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+// GetManagersHandler выдает всех менеджеров.
+func GetManagersHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "handler.user.GetManagersHandler"
+
+		log = log.With(
+			slog.String("reqID", middleware.GetReqID(r.Context())),
+			slog.String("op", op),
+		)
+
+		managers, err := db.GetManagers()
+		if err != nil {
+			log.Error("error while getting managers", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+
+		if managers == nil {
+			render.JSON(w, r, []string{})
+			return
+		}
+
+		if err := render.RenderList(w, r, resp.NewManagerListRender(managers)); err != nil {
+			log.Error("error while rendering managers", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+	}
+}
+
+// GetManagerByIDHandler выдает полную информацию о менеджере по его ID.
+func GetManagerByIDHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "handler.user.GetManagerByIDHandler"
+
+		log = log.With(
+			slog.String("op", op),
+			slog.String("reqID", middleware.GetReqID(r.Context())),
+		)
+
+		urlParam := chi.URLParam(r, "id")
+		managerID, err := strconv.Atoi(urlParam)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		getManagerAndSend(w, r, db, managerID, cfg)
+	}
+}
+
+func getManagerAndSend(w http.ResponseWriter, r *http.Request, db UserGetter, managerID int, cfg *config.Config) {
+	manager, err := db.GetManagerByID(managerID)
+	if err != nil {
+		resp.ErrorHandler(w, r, cfg, err)
+		return
+	}
+
+	if manager == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	render.JSON(w, r, resp.NewManagerResponse(manager))
+}
+
+type UserPatch struct {
+	ID       int
+	Login    *string `json:"login,omitempty" validate:"omitempty,min=4,max=8"`
+	Password *string `json:"password,omitempty" validate:"omitempty,min=4,max=10"`
+	Email    *string `json:"email,omitempty" validate:"omitempty,email,min=8,max=15"`
+}
+
+// UpdateManagerHandler обновляет данные о менеджере.
+func UpdateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "handler.user.UpdateManagerHandler"
+
+		log = log.With(
+			slog.String("reqID", middleware.GetReqID(r.Context())),
+			slog.String("op", op),
+		)
+
+		managerID, err := strconv.Atoi(chi.URLParam(r, "id"))
+		if err != nil {
+			log.Error("error while getting ID", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+
+		var managerUpdate UserPatch
+		managerUpdate.ID = managerID
+		err = render.DecodeJSON(r.Body, &managerUpdate)
+		if err != nil {
+			log.Error("error while decoding JSON", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+
+		if managerUpdate.Email == nil && managerUpdate.Login == nil && managerUpdate.Password == nil {
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, resp.UnknownError("no data provided"))
+			return
+		}
+
+		valid := customValidator.CreateNewValidator()
+		if err := valid.Struct(managerUpdate); err != nil {
+			var validErr validator.ValidationErrors
+			if ok := errors.As(err, &validErr); ok {
+				resp.ValidationError(validErr)
+				return
+			}
+			log.Error("error while validating struct", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+
+		err = db.UpdateManager(&managerUpdate)
+		if err != nil {
+			log.Error("error while updating manager", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+
+		getManagerAndSend(w, r, db.(UserGetter), managerID, cfg)
+	}
+}
+
+func DeleteManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "handler.user.DeleteManagerHandler"
+
+		log = log.With(
+			slog.String("reqID", middleware.GetReqID(r.Context())),
+			slog.String("op", op),
+		)
+
+		managerID, err := strconv.Atoi(chi.URLParam(r, "id"))
+		if err != nil {
+			log.Error("error while parsing ID", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+
+		err = db.DeleteManager(managerID)
+		if err != nil {
+			log.Error("error while deleting manager", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
