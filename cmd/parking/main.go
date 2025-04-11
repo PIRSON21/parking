@@ -8,6 +8,7 @@ import (
 	"github.com/PIRSON21/parking/internal/http-server/handler/user"
 	authMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	"github.com/PIRSON21/parking/internal/storage/postgresql"
+	"github.com/PIRSON21/parking/internal/ws"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"log"
@@ -69,6 +70,7 @@ func main() {
 
 	router.Group(func(public chi.Router) {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
+		public.Get("/ws/simulate", ws.WebSocketHandler(log, cfg))
 	})
 
 	router.Group(func(user chi.Router) {

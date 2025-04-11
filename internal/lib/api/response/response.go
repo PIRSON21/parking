@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"net/http"
+	"strings"
 )
 
 type Response struct {
@@ -85,12 +86,13 @@ func NewParkingListRender(parkings []*models.Parking) []render.Renderer {
 // validationErrorMessages нужна для получения стандартного сообщения ошибки
 // для тегов ошибок типа validator.ValidationErrors.
 var validationErrorMessages = map[string]string{
-	"required": "Не указано поле",
-	"min":      "Минимальная длина поля %s",
-	"max":      "Максимальная длина поля %s",
-	"lte":      "Значение не может быть больше %s",
-	"gte":      "Значение не может быть меньше %s",
-	"email":    "Введенное значение не email",
+	"required":           "Не указано поле",
+	"min":                "Минимальная длина поля %s",
+	"max":                "Максимальная длина поля %s",
+	"lte":                "Значение не может быть больше %s",
+	"gte":                "Значение не может быть меньше %s",
+	"email":              "Введенное значение не email",
+	"required_with_type": "Необходимо вместе с %s",
 }
 
 func ValidationError(validateErr validator.ValidationErrors) map[string]string {
@@ -114,6 +116,47 @@ func ValidationError(validateErr validator.ValidationErrors) map[string]string {
 	}
 
 	return fieldErrors
+}
+
+func RecursiveValidationError(validateErr validator.ValidationErrors) map[string]interface{} {
+	fieldErrors := make(map[string]interface{})
+
+	for _, err := range validateErr {
+		namespace := err.Namespace()
+		path := strings.Split(namespace, ".")
+
+		tag := err.Tag()
+		param := err.Param()
+
+		var errMessage string
+		if param != "" {
+			errMessage = fmt.Sprintf(validationErrorMessages[tag], param)
+		} else {
+			errMessage = validationErrorMessages[tag]
+		}
+
+		if errMessage != "" {
+			insertFieldError(fieldErrors, path, errMessage)
+		}
+	}
+
+	return fieldErrors
+}
+
+func insertFieldError(m map[string]interface{}, path []string, message string) {
+	if len(path) == 1 {
+		m[path[0]] = message
+		return
+	}
+
+	key := path[0]
+
+	if _, ok := m[key]; !ok {
+		m[key] = make(map[string]interface{})
+	}
+
+	subMap, _ := m[key].(map[string]interface{})
+	insertFieldError(subMap, path[1:], message)
 }
 
 // ErrorHandler обрабатывает серверную ошибку (не клиентскую).
