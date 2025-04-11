@@ -1,19 +1,18 @@
 package ws
 
 import (
+	"github.com/PIRSON21/parking/internal/config"
+	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	custom_validator "github.com/PIRSON21/parking/internal/lib/validator"
+	"github.com/PIRSON21/parking/internal/models"
+	"github.com/PIRSON21/parking/internal/simulation"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-playground/validator/v10"
+	"github.com/gorilla/websocket"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/PIRSON21/parking/internal/config"
-	resp "github.com/PIRSON21/parking/internal/lib/api/response"
-	"github.com/PIRSON21/parking/internal/models"
-	"github.com/PIRSON21/parking/internal/simulation"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
@@ -46,7 +45,7 @@ func WebSocketHandler(log *slog.Logger, cfg *config.Config) http.HandlerFunc {
 			Parking           *models.Parking               `json:"parking" validate:"required"`
 			ArrivalConfig     *simulation.ArrivalConfig     `json:"arrival_config" validate:"required"`
 			ParkingTimeConfig *simulation.ParkingTimeConfig `json:"parking_time_config" validate:"required"`
-			StartTime         time.Time                     `json:"start_time" validate:"required"`
+			StartTime         int64                         `json:"start_time" validate:"required"`
 		}
 
 		err = conn.ReadJSON(&initParams)
@@ -57,6 +56,7 @@ func WebSocketHandler(log *slog.Logger, cfg *config.Config) http.HandlerFunc {
 		}
 
 		valid := custom_validator.CreateNewValidator()
+		// добавление кастомной валидации для параметров моделирования
 		valid.RegisterStructValidation(custom_validator.ArrivalConfigStructLevelValidation, simulation.ArrivalConfig{})
 		valid.RegisterStructValidation(custom_validator.ParkingTimeConfigStructLevelValidation, simulation.ParkingTimeConfig{})
 		if err := valid.Struct(&initParams); err != nil {
@@ -67,7 +67,7 @@ func WebSocketHandler(log *slog.Logger, cfg *config.Config) http.HandlerFunc {
 
 		// создаем сессию клиента
 		session := simulation.NewSession(
-			client, initParams.Parking, initParams.StartTime,
+			client, initParams.Parking, time.Unix(initParams.StartTime, 0),
 			initParams.ArrivalConfig, initParams.ParkingTimeConfig,
 		)
 

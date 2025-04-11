@@ -89,7 +89,7 @@ func main() {
 	router.Group(func(admin chi.Router) {
 		admin.Use(authMiddleware.AuthMiddleware(db))
 		admin.Use(authMiddleware.AdminMiddleware)
-		admin.Post("/parking/add", parking.AddParkingHandler(log, db, cfg))
+		admin.Post("/parking", parking.AddParkingHandler(log, db, cfg))
 		admin.Post("/create_manager", user.CreateManagerHandler(log, db, cfg))
 	})
 

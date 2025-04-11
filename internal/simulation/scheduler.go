@@ -16,7 +16,7 @@ type CarEvent struct {
 	ParkID    *int   `json:"park_id,omitempty"` // id парковочного места
 	ParkX     *int   `json:"park_x,omitempty"`  // х координата парковочного места
 	ParkY     *int   `json:"park_y,omitempty"`  // y координата парковочного места
-	Price     int    `json:"price,omitempty"`   // стоимость парковки
+	Price     *int   `json:"price,omitempty"`   // стоимость парковки
 }
 
 const (
@@ -193,7 +193,7 @@ func (ss *Session) scheduleLeave(carID string, spot *models.ParkingSpot) {
 			return
 		}
 
-		car.Price = calculateParkingCost(ss.timer.elapsedTime, car.EnterTime)
+		car.Price = ss.calculateParkingCost(ss.timer.elapsedTime, car.EnterTime)
 
 		ss.parking.ReleaseSpot(spot)
 		ss.mu.Unlock()
@@ -220,7 +220,7 @@ func (ss *Session) sendLeaveParkEvent(carID string) {
 		ParkX:     &car.Spot.X,
 		ParkY:     &car.Spot.Y,
 		TimeStamp: ss.timer.elapsedTime.Unix(),
-		Price:     car.Price,
+		Price:     &car.Price,
 	}
 
 	delete(ss.car, carID)

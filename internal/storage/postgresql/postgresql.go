@@ -46,7 +46,7 @@ func MustConnectDB(cfg *config.Config) *Storage {
 func (s *Storage) GetAdminParkings(search string) ([]*models.Parking, error) {
 	query := `
 			SELECT 
-			    parking_id, parking_name, parking_address, parking_width, parking_height 
+			    parking_id, parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff 
 			FROM parkings
 			WHERE parking_name ILIKE $1
     `
@@ -58,7 +58,7 @@ func (s *Storage) GetAdminParkings(search string) ([]*models.Parking, error) {
 func (s *Storage) GetManagerParkings(userID int, search string) ([]*models.Parking, error) {
 	query := `
 			SELECT 
-			    parking_id, parking_name, parking_address, parking_width, parking_height 
+			    parking_id, parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff
 			FROM parkings
 			WHERE parking_name ILIKE $1 AND manager_id = $2
     `
@@ -90,7 +90,7 @@ func (s *Storage) fetchParkings(query string, args ...interface{}) ([]*models.Pa
 	for rows.Next() {
 		var parking models.Parking
 
-		err = rows.Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height)
+		err = rows.Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &parking.DayTariff, &parking.NightTariff)
 		if err != nil {
 			log.Printf("%s: error while reading rows: %v", op, err)
 		}
@@ -110,15 +110,15 @@ func (s *Storage) AddParking(parking *models.Parking) error {
 	const op = "storage.postgresql.AddParking"
 
 	stmt, err := s.db.Prepare(`
-		INSERT INTO parkings (parking_name, parking_address, parking_width, parking_height)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO parkings (parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING parking_id;
 	`)
 	if err != nil {
 		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
-	err = stmt.QueryRow(parking.Name, parking.Address, parking.Width, parking.Height).Scan(&parking.ID)
+	err = stmt.QueryRow(parking.Name, parking.Address, parking.Width, parking.Height, parking.DayTariff, parking.NightTariff).Scan(&parking.ID)
 	if err != nil {
 		return fmt.Errorf("%s: error while executing statement: %w", op, err)
 	}
@@ -134,7 +134,7 @@ func (s *Storage) GetParkingByID(parkingID int) (*models.Parking, error) {
 
 	stmt, err := s.db.Prepare(`
 	SELECT 
-	    parking_id, parking_name, parking_address, parking_width, parking_height, manager_id
+	    parking_id, parking_name, parking_address, parking_width, parking_height, manager_id, day_tariff, night_tariff 
 	FROM parkings
 	WHERE parking_id = $1;
 `)
@@ -144,7 +144,7 @@ func (s *Storage) GetParkingByID(parkingID int) (*models.Parking, error) {
 
 	var parking models.Parking
 	var managerID sql.NullInt64
-	if err = stmt.QueryRow(parkingID).Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &managerID); err != nil {
+	if err = stmt.QueryRow(parkingID).Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &managerID, &parking.DayTariff, &parking.NightTariff); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}

@@ -9,9 +9,6 @@ import (
 const (
 	dayStartHour   = 6
 	nightStartHour = 22
-
-	rateDay   = 2.50
-	rateNight = 1.50
 )
 
 // generateArrivalDelay вычисляет задержку появления автомобиля в зависимости от типа потока.
@@ -78,10 +75,7 @@ func (ss *Session) generateLeaveDelay() time.Duration {
 }
 
 // calculateParkingCost вычисляет стоимость стоянки.
-func calculateParkingCost(now time.Time, entered time.Time) int {
-	// TODO: сделать поддержку параметров
-	// TODO: сделать поддержку тарифов
-
+func (ss *Session) calculateParkingCost(now time.Time, entered time.Time) int {
 	totalCost := 0.0
 
 	for entered.Before(now) {
@@ -90,12 +84,12 @@ func calculateParkingCost(now time.Time, entered time.Time) int {
 		// если машина уезжает до следующей смены тарифа
 		if now.Before(nextBoundary) {
 			duration := now.Sub(entered)
-			totalCost += calculateSegmentCost(duration, entered)
+			totalCost += calculateSegmentCost(duration, entered, ss.parking.DayTariff, ss.parking.NightTariff)
 			break
 		}
 		// если уезжает позже смены
 		duration := nextBoundary.Sub(entered)
-		totalCost += calculateSegmentCost(duration, entered)
+		totalCost += calculateSegmentCost(duration, entered, ss.parking.DayTariff, ss.parking.NightTariff)
 
 		entered = nextBoundary
 	}
@@ -115,7 +109,7 @@ func getNextBoundary(t time.Time) time.Time {
 }
 
 // calculateSegmentCost вычисляет стоимость парковки для длительности d.
-func calculateSegmentCost(d time.Duration, t time.Time) float64 {
+func calculateSegmentCost(d time.Duration, t time.Time, rateDay, rateNight float64) float64 {
 	hour := t.Hour()
 
 	if hour >= nightStartHour || hour < dayStartHour {
