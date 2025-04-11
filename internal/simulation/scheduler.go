@@ -85,8 +85,6 @@ func (ss *Session) sendCarEvent() {
 	}
 
 	ss.client.Send(data)
-
-	ss.tryToPark(carID)
 }
 
 // tryToPark определяет, заедет машина на парковку или нет.
