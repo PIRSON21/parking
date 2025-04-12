@@ -10,6 +10,15 @@ func MustMarshal(v interface{}) []byte {
 	return data
 }
 
+func MustMarshalResponse(v interface{}) string {
+	var res []byte
+	res, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return string(res)
+}
+
 const (
 	EnvLocal = "local"
 	EnvDev   = "dev"

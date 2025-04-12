@@ -40,6 +40,66 @@ func (_m *UserGetter) AuthenticateManager(manager *models.User) (int, error) {
 	return r0, r1
 }
 
+// GetManagerByID provides a mock function with given fields: id
+func (_m *UserGetter) GetManagerByID(id int) (*models.User, error) {
+	ret := _m.Called(id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetManagerByID")
+	}
+
+	var r0 *models.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int) (*models.User, error)); ok {
+		return rf(id)
+	}
+	if rf, ok := ret.Get(0).(func(int) *models.User); ok {
+		r0 = rf(id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int) error); ok {
+		r1 = rf(id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetManagers provides a mock function with no fields
+func (_m *UserGetter) GetManagers() ([]*models.User, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetManagers")
+	}
+
+	var r0 []*models.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]*models.User, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []*models.User); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SetSessionID provides a mock function with given fields: userID, sessionID
 func (_m *UserGetter) SetSessionID(userID int, sessionID string) error {
 	ret := _m.Called(userID, sessionID)

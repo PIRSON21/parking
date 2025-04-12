@@ -150,8 +150,8 @@ func setSessionCookie(w http.ResponseWriter, sessionID string) {
 type UserSetter interface {
 	CreateNewManager(*request.UserCreate) error
 	UpdateManager(*UserPatch) error
-	GetManagerByID(int) (*models.User, error)
 	DeleteManager(int) error
+	GetManagerByID(id int) (*models.User, error)
 }
 
 // CreateManagerHandler обрабатывает запрос на создание менеджера
@@ -247,7 +247,7 @@ func GetManagerByIDHandler(log *slog.Logger, db UserGetter, cfg *config.Config) 
 		urlParam := chi.URLParam(r, "id")
 		managerID, err := strconv.Atoi(urlParam)
 		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
+			http.NotFound(w, r)
 			return
 		}
 
@@ -255,7 +255,11 @@ func GetManagerByIDHandler(log *slog.Logger, db UserGetter, cfg *config.Config) 
 	}
 }
 
-func getManagerAndSend(w http.ResponseWriter, r *http.Request, db UserGetter, managerID int, cfg *config.Config) {
+type UserGetterByID interface {
+	GetManagerByID(int) (*models.User, error)
+}
+
+func getManagerAndSend(w http.ResponseWriter, r *http.Request, db UserGetterByID, managerID int, cfg *config.Config) {
 	manager, err := db.GetManagerByID(managerID)
 	if err != nil {
 		resp.ErrorHandler(w, r, cfg, err)
@@ -295,8 +299,8 @@ func UpdateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 		}
 
 		var managerUpdate UserPatch
-		managerUpdate.ID = managerID
 		err = render.DecodeJSON(r.Body, &managerUpdate)
+		managerUpdate.ID = managerID
 		if err != nil {
 			log.Error("error while decoding JSON", slog.String("err", err.Error()))
 			resp.ErrorHandler(w, r, cfg, err)
@@ -313,7 +317,8 @@ func UpdateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 		if err := valid.Struct(managerUpdate); err != nil {
 			var validErr validator.ValidationErrors
 			if ok := errors.As(err, &validErr); ok {
-				resp.ValidationError(validErr)
+				render.Status(r, http.StatusBadRequest)
+				render.JSON(w, r, resp.ValidationError(validErr))
 				return
 			}
 			log.Error("error while validating struct", slog.String("err", err.Error()))
@@ -328,10 +333,11 @@ func UpdateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 			return
 		}
 
-		getManagerAndSend(w, r, db.(UserGetter), managerID, cfg)
+		getManagerAndSend(w, r, db, managerID, cfg)
 	}
 }
 
+// DeleteManagerHandler удаляет менеджера.
 func DeleteManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handler.user.DeleteManagerHandler"
