@@ -12,9 +12,9 @@ type ParkingGetter struct {
 	mock.Mock
 }
 
-// GetAdminParkings provides a mock function with given fields: search
-func (_m *ParkingGetter) GetAdminParkings(search string) ([]*models.Parking, error) {
-	ret := _m.Called(search)
+// GetAdminParkings provides a mock function with given fields: _a0
+func (_m *ParkingGetter) GetAdminParkings(_a0 string) ([]*models.Parking, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAdminParkings")
@@ -23,10 +23,10 @@ func (_m *ParkingGetter) GetAdminParkings(search string) ([]*models.Parking, err
 	var r0 []*models.Parking
 	var r1 error
 	if rf, ok := ret.Get(0).(func(string) ([]*models.Parking, error)); ok {
-		return rf(search)
+		return rf(_a0)
 	}
 	if rf, ok := ret.Get(0).(func(string) []*models.Parking); ok {
-		r0 = rf(search)
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.Parking)
@@ -34,7 +34,7 @@ func (_m *ParkingGetter) GetAdminParkings(search string) ([]*models.Parking, err
 	}
 
 	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(search)
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -42,9 +42,9 @@ func (_m *ParkingGetter) GetAdminParkings(search string) ([]*models.Parking, err
 	return r0, r1
 }
 
-// GetManagerParkings provides a mock function with given fields: userID, search
-func (_m *ParkingGetter) GetManagerParkings(userID int, search string) ([]*models.Parking, error) {
-	ret := _m.Called(userID, search)
+// GetManagerParkings provides a mock function with given fields: _a0, _a1
+func (_m *ParkingGetter) GetManagerParkings(_a0 int, _a1 string) ([]*models.Parking, error) {
+	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetManagerParkings")
@@ -53,10 +53,10 @@ func (_m *ParkingGetter) GetManagerParkings(userID int, search string) ([]*model
 	var r0 []*models.Parking
 	var r1 error
 	if rf, ok := ret.Get(0).(func(int, string) ([]*models.Parking, error)); ok {
-		return rf(userID, search)
+		return rf(_a0, _a1)
 	}
 	if rf, ok := ret.Get(0).(func(int, string) []*models.Parking); ok {
-		r0 = rf(userID, search)
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.Parking)
@@ -64,7 +64,7 @@ func (_m *ParkingGetter) GetManagerParkings(userID int, search string) ([]*model
 	}
 
 	if rf, ok := ret.Get(1).(func(int, string) error); ok {
-		r1 = rf(userID, search)
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -72,9 +72,9 @@ func (_m *ParkingGetter) GetManagerParkings(userID int, search string) ([]*model
 	return r0, r1
 }
 
-// GetParkingByID provides a mock function with given fields: parkingID
-func (_m *ParkingGetter) GetParkingByID(parkingID int) (*models.Parking, error) {
-	ret := _m.Called(parkingID)
+// GetParkingByID provides a mock function with given fields: _a0, _a1
+func (_m *ParkingGetter) GetParkingByID(_a0 int, _a1 int) (*models.Parking, error) {
+	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetParkingByID")
@@ -82,49 +82,19 @@ func (_m *ParkingGetter) GetParkingByID(parkingID int) (*models.Parking, error) 
 
 	var r0 *models.Parking
 	var r1 error
-	if rf, ok := ret.Get(0).(func(int) (*models.Parking, error)); ok {
-		return rf(parkingID)
+	if rf, ok := ret.Get(0).(func(int, int) (*models.Parking, error)); ok {
+		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(int) *models.Parking); ok {
-		r0 = rf(parkingID)
+	if rf, ok := ret.Get(0).(func(int, int) *models.Parking); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Parking)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(int) error); ok {
-		r1 = rf(parkingID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetParkingCells provides a mock function with given fields: _a0
-func (_m *ParkingGetter) GetParkingCells(_a0 *models.Parking) ([][]models.ParkingCell, error) {
-	ret := _m.Called(_a0)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetParkingCells")
-	}
-
-	var r0 [][]models.ParkingCell
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*models.Parking) ([][]models.ParkingCell, error)); ok {
-		return rf(_a0)
-	}
-	if rf, ok := ret.Get(0).(func(*models.Parking) [][]models.ParkingCell); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]models.ParkingCell)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*models.Parking) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(int, int) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}

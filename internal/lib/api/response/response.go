@@ -21,12 +21,13 @@ type RespErrorList struct {
 
 // ParkingResponse - формат информации для response об одной парковке.
 type ParkingResponse struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Address     string `json:"address"`
-	DayTariff   int    `json:"day_tariff"`
-	NightTariff int    `json:"night_tariff"`
-	URL         string `json:"url"`
+	ID          int                    `json:"id"`
+	Name        string                 `json:"name"`
+	Address     string                 `json:"address"`
+	DayTariff   int                    `json:"day_tariff"`
+	NightTariff int                    `json:"night_tariff"`
+	Cells       [][]models.ParkingCell `json:"cells"`
+	URL         string                 `json:"url"`
 }
 
 // UnknownError - ответ, возвращаемый без конкретного поля ошибки.
@@ -63,6 +64,7 @@ func NewParkingResponse(p *models.Parking) *ParkingResponse {
 		Address:     p.Address,
 		DayTariff:   p.DayTariff,
 		NightTariff: p.NightTariff,
+		Cells:       append([][]models.ParkingCell{}, p.Cells...),
 		URL:         fmt.Sprintf("/parking/%d", p.ID),
 	}
 }

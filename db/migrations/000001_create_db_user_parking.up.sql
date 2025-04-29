@@ -1,9 +1,3 @@
--- Создание базы данных
-CREATE DATABASE parking;
-
--- Создание пользователя
-CREATE USER parking WITH PASSWORD 'parking';
-
 -- Назначение владельца базы данных
 ALTER DATABASE parking OWNER TO parking;
 

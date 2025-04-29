@@ -411,7 +411,7 @@ func TestCreateManagerHandler(t *testing.T) {
 				Password: "aboba",
 				Email:    "aboba@mail.ru",
 			}),
-			ResponseCode: http.StatusInternalServerError,
+			ResponseCode: http.StatusConflict,
 			JSON:         true,
 			ResponseBody: fmt.Sprintf(test.ExpectedError, "такой менеджер уже существует"),
 		},
@@ -462,18 +462,14 @@ func TestCreateManagerHandler(t *testing.T) {
 			}
 
 			user.CreateManagerHandler(log, userSetterMock, cfg).ServeHTTP(rr, req)
-			require.Equal(t, tc.ResponseCode, rr.Code)
+			assert.Equal(t, tc.ResponseCode, rr.Code)
 
 			respBody := rr.Body.String()
 
 			if tc.JSON {
 				assert.JSONEq(t, tc.ResponseBody, respBody)
-
-				return
 			} else {
 				assert.Equal(t, tc.ResponseBody, respBody)
-
-				return
 			}
 		})
 	}
@@ -504,18 +500,18 @@ func TestDeleteManagerHandler(t *testing.T) {
 			ManagerIDStr:       "aboba",
 			DeleteManagerError: nil,
 			Environment:        "prod",
-			StatusCode:         http.StatusInternalServerError,
-			JSON:               false,
-			ResponseBody:       test.InternalServerErrorMessage,
+			StatusCode:         http.StatusBadRequest,
+			JSON:               true,
+			ResponseBody:       fmt.Sprintf(test.ExpectedError, user.InvalidManagerIndex.Error()),
 		},
 		{
 			Name:               "Not int id on dev",
 			ManagerID:          0,
 			ManagerIDStr:       "aboba",
 			DeleteManagerError: nil,
-			StatusCode:         http.StatusInternalServerError,
+			StatusCode:         http.StatusBadRequest,
 			JSON:               true,
-			ResponseBody:       fmt.Sprintf(test.ExpectedError, "strconv.Atoi: parsing \"aboba\": invalid syntax"),
+			ResponseBody:       fmt.Sprintf(test.ExpectedError, user.InvalidManagerIndex.Error()),
 		},
 		{
 			Name:               "DB error on prod",
@@ -615,8 +611,9 @@ func TestGetManagerByIDHandler(t *testing.T) {
 			Name:         "Wrong id",
 			ManagerIDStr: "aboba",
 			Environment:  "prod",
-			StatusCode:   http.StatusNotFound,
-			ResponseBody: test.NotFound,
+			StatusCode:   http.StatusBadRequest,
+			JSON:         true,
+			ResponseBody: fmt.Sprintf(test.ExpectedError, user.InvalidManagerIndex.Error()),
 		},
 		{
 			Name:             "DB error on prod",

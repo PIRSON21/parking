@@ -78,6 +78,8 @@ func main() {
 		user.Route("/parking", func(r chi.Router) {
 			r.Get("/", parking.AllParkingsHandler(log, db, cfg))
 			r.Get("/{id}", parking.GetParkingHandler(log, db, cfg))
+			r.Patch("/{id}", parking.UpdateParkingHandler(log, db, cfg))
+			r.Delete("/{id}", parking.DeleteParkingHandler(log, db, cfg))
 		})
 	})
 

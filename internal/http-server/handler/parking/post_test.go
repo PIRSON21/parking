@@ -10,11 +10,14 @@ import (
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
 	"github.com/PIRSON21/parking/internal/lib/test"
 	"github.com/PIRSON21/parking/internal/models"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 )
 
@@ -68,7 +71,7 @@ func TestAddParkingHandler(t *testing.T) {
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
-			ResponseCode:            http.StatusNoContent,
+			ResponseCode:            http.StatusCreated,
 			ExpectedResponse:        "",
 			JSON:                    false,
 		},
@@ -91,7 +94,7 @@ func TestAddParkingHandler(t *testing.T) {
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
-			ResponseCode:            http.StatusNoContent,
+			ResponseCode:            http.StatusCreated,
 			ExpectedResponse:        "",
 			JSON:                    false,
 		},
@@ -391,54 +394,6 @@ func TestAddParkingHandler(t *testing.T) {
 			Environment:             test.EnvProd,
 		},
 		{
-			Name: "Internal addCellsForParking error on dev",
-			RequestBody: test.MustMarshal(models.Parking{
-				Name:        "1: Центр",
-				Address:     "ул. Пушкина, д. Колотушкина",
-				Width:       5,
-				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
-				Cells: [][]models.ParkingCell{
-					{".", ".", ".", ".", "I"},
-					{".", "P", "P", "P", "."},
-					{".", "D", "D", ".", "."},
-					{".", ".", ".", ".", "."},
-					{"O", ".", ".", "P", "P"},
-				},
-			}),
-			AddParkingError:         nil,
-			AddCellsForParkingError: fmt.Errorf("test parking error"),
-			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        fmt.Sprintf(test.ExpectedError, "http-server.handler.parking.AddParkingHandler: error while adding cells to DB: test parking error"),
-			JSON:                    true,
-			Environment:             test.EnvLocal,
-		},
-		{
-			Name: "Internal addCellsForParking error on prod",
-			RequestBody: test.MustMarshal(models.Parking{
-				Name:        "1: Центр",
-				Address:     "ул. Пушкина, д. Колотушкина",
-				Width:       5,
-				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
-				Cells: [][]models.ParkingCell{
-					{".", ".", ".", ".", "I"},
-					{".", "P", "P", "P", "."},
-					{".", "D", "D", ".", "."},
-					{".", ".", ".", ".", "."},
-					{"O", ".", ".", "P", "P"},
-				},
-			}),
-			AddParkingError:         nil,
-			AddCellsForParkingError: fmt.Errorf("test parking error"),
-			ResponseCode:            http.StatusInternalServerError,
-			ExpectedResponse:        test.InternalServerErrorMessage,
-			JSON:                    false,
-			Environment:             test.EnvProd,
-		},
-		{
 			Name: "DayTariff value upper max",
 			RequestBody: test.MustMarshal(models.Parking{
 				Name:        "1: Центр",
@@ -535,6 +490,7 @@ func TestAddParkingHandler(t *testing.T) {
 			require.Equal(t, tc.ResponseCode, rr.Code)
 
 			body := rr.Body.String()
+			fmt.Println(body)
 
 			if tc.JSON {
 				assert.JSONEq(t, tc.ExpectedResponse, body)
@@ -550,4 +506,73 @@ func TestAddParkingHandler(t *testing.T) {
 		})
 	}
 
+}
+
+func TestDeleteParkingHandler(t *testing.T) {
+	cases := []struct {
+		Name               string
+		ParkingID          int
+		ParkingIDStr       string
+		DeleteParkingError error
+		Environment        string
+		StatusCode         int
+		JSON               bool
+		ResponseBody       string
+	}{
+		{
+			Name:               "Success",
+			ParkingID:          1,
+			DeleteParkingError: nil,
+			StatusCode:         http.StatusNoContent,
+			JSON:               false,
+			ResponseBody:       "",
+		},
+		{
+			Name:               "Invalid ParkingID on prod",
+			ParkingID:          0,
+			ParkingIDStr:       "ab",
+			DeleteParkingError: nil,
+			Environment:        "",
+			StatusCode:         http.StatusBadRequest,
+			JSON:               true,
+			ResponseBody:       fmt.Sprintf(test.ExpectedError, "invalid parkingID syntax"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			parkingSetterMock := mocks.NewParkingSetter(t)
+			parkingSetterMock.On("DeleteParking", tc.ParkingID).
+				Return(tc.DeleteParkingError).
+				Maybe()
+
+			if tc.ParkingIDStr == "" {
+				tc.ParkingIDStr = strconv.Itoa(tc.ParkingID)
+			}
+
+			r := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/manager/%s", tc.ParkingIDStr), nil)
+			rr := httptest.NewRecorder()
+
+			log := slogdiscard.NewDiscardLogger()
+			cfg := &config.Config{}
+			if tc.Environment != "" {
+				cfg.Environment = tc.Environment
+			}
+
+			router := chi.NewRouter()
+			router.Use(middleware.URLFormat)
+			router.Delete("/manager/{id}", parking.DeleteParkingHandler(log, parkingSetterMock, cfg))
+
+			router.ServeHTTP(rr, r)
+			assert.Equal(t, tc.StatusCode, rr.Code)
+
+			body := rr.Body.String()
+
+			if tc.JSON {
+				assert.JSONEq(t, tc.ResponseBody, body)
+			} else {
+				assert.Equal(t, tc.ResponseBody, body)
+			}
+		})
+	}
 }

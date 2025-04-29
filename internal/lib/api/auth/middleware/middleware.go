@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"errors"
-	"fmt"
 	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"net/http"
 )
@@ -56,7 +55,6 @@ func AdminMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userIDVal := r.Context().Value(UserIDKey)
 		if userID, ok := userIDVal.(int); ok {
-			fmt.Println(userID)
 			if userID != 0 {
 				http.Error(w, "Access denied", http.StatusForbidden)
 				return

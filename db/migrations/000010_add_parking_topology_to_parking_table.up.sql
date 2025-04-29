@@ -1,0 +1,1 @@
+ALTER TABLE parkings ADD COLUMN IF NOT EXISTS parking_topology JSONb NULL DEFAULT '[]';

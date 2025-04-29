@@ -14,11 +14,14 @@ import (
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+)
+
+var (
+	InvalidManagerIndex = errors.New("invalid managerID index")
 )
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=UserGetter
@@ -62,7 +65,7 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 		}
 
 		// проверка на администратора. По условиям задачи, администратор должен иметь один единственный аккаунт,
-		// которые встроен в коде программы
+		// которые встроен в коде программы. Я ЗНАЮ, ЧТО ТАК НЕ НАДО. так просили
 		if userReq.Login == "admin" && userReq.Password == "admin" {
 			err = returnSessionID(w, 0, db)
 			if err != nil {
@@ -72,7 +75,6 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 
 				return
 			}
-
 			return
 		}
 
@@ -185,18 +187,14 @@ func CreateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 
 		err := db.CreateNewManager(newManager)
 		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if errors.Is(err, customErr.ErrManagerAlreadyExists) {
 				render.Status(r, http.StatusConflict)
-				render.JSON(w, r, resp.UnknownError(customErr.ErrManagerAlreadyExists.Error()))
-
+				render.JSON(w, r, resp.UnknownError(err.Error()))
 				return
 			}
 
 			log.Error("error while creating new manager", slog.String("err", err.Error()))
-
 			resp.ErrorHandler(w, r, cfg, err)
-
 			return
 		}
 
@@ -244,10 +242,10 @@ func GetManagerByIDHandler(log *slog.Logger, db UserGetter, cfg *config.Config) 
 			slog.String("reqID", middleware.GetReqID(r.Context())),
 		)
 
-		urlParam := chi.URLParam(r, "id")
-		managerID, err := strconv.Atoi(urlParam)
+		managerID, err := strconv.Atoi(chi.URLParam(r, "id"))
 		if err != nil {
-			http.NotFound(w, r)
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, resp.UnknownError(InvalidManagerIndex.Error()))
 			return
 		}
 
@@ -294,7 +292,8 @@ func UpdateManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 		managerID, err := strconv.Atoi(chi.URLParam(r, "id"))
 		if err != nil {
 			log.Error("error while getting ID", slog.String("err", err.Error()))
-			resp.ErrorHandler(w, r, cfg, err)
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, resp.UnknownError(InvalidManagerIndex.Error()))
 			return
 		}
 
@@ -350,7 +349,8 @@ func DeleteManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 		managerID, err := strconv.Atoi(chi.URLParam(r, "id"))
 		if err != nil {
 			log.Error("error while parsing ID", slog.String("err", err.Error()))
-			resp.ErrorHandler(w, r, cfg, err)
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, resp.UnknownError(InvalidManagerIndex.Error()))
 			return
 		}
 
