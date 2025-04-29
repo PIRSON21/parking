@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -20,12 +21,13 @@ type RespErrorList struct {
 
 // ParkingResponse - формат информации для response об одной парковке.
 type ParkingResponse struct {
-	ID      int    `json:"id"`
-	Name    string `json:"name"`
-	Address string `json:"address"`
-	Height  int    `json:"height"`
-	Width   int    `json:"width"`
-	URL     string `json:"url"`
+	ID          int                    `json:"id"`
+	Name        string                 `json:"name"`
+	Address     string                 `json:"address"`
+	DayTariff   int                    `json:"day_tariff"`
+	NightTariff int                    `json:"night_tariff"`
+	Cells       [][]models.ParkingCell `json:"cells"`
+	URL         string                 `json:"url"`
 }
 
 // UnknownError - ответ, возвращаемый без конкретного поля ошибки.
@@ -57,12 +59,13 @@ func ListError(field string, errors []error) map[string]interface{} {
 // NewParkingResponse создает ответ ParkingResponse для рендера.
 func NewParkingResponse(p *models.Parking) *ParkingResponse {
 	return &ParkingResponse{
-		ID:      p.ID,
-		Name:    p.Name,
-		Address: p.Address,
-		Height:  p.Height,
-		Width:   p.Width,
-		URL:     fmt.Sprintf("/parking/%d", p.ID),
+		ID:          p.ID,
+		Name:        p.Name,
+		Address:     p.Address,
+		DayTariff:   p.DayTariff,
+		NightTariff: p.NightTariff,
+		Cells:       append([][]models.ParkingCell{}, p.Cells...),
+		URL:         fmt.Sprintf("/parking/%d", p.ID),
 	}
 }
 
@@ -179,4 +182,35 @@ func internalError(w http.ResponseWriter) {
 func renderError(w http.ResponseWriter, r *http.Request, err error) {
 	render.Status(r, http.StatusInternalServerError)
 	render.JSON(w, r, UnknownError(err.Error()))
+}
+
+type ManagerResponse struct {
+	ID    int    `json:"manager_id"`
+	Login string `json:"manager_login"`
+	Email string `json:"manager_email"`
+	URL   string `json:"manager_url"`
+}
+
+func NewManagerResponse(manager *models.User) *ManagerResponse {
+	return &ManagerResponse{
+		ID:    manager.ID,
+		Login: manager.Login,
+		Email: manager.Email,
+		URL:   "/manager/" + strconv.Itoa(manager.ID),
+	}
+}
+
+func (*ManagerResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func NewManagerListRender(managers []*models.User) []render.Renderer {
+	var res []render.Renderer
+
+	for _, manager := range managers {
+		resp := NewManagerResponse(manager)
+		res = append(res, resp)
+	}
+
+	return res
 }

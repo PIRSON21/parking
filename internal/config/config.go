@@ -12,6 +12,7 @@ type Config struct {
 }
 
 type ConfigDB struct {
+	DBHost     string `env:"DB_HOST,required"`
 	DBName     string `env:"DB_NAME,required"`
 	DBUsername string `env:"DB_USER,required"`
 	DBPassword string `env:"DB_PASSWORD,required"`

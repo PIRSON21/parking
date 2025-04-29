@@ -11,6 +11,8 @@
 База данных - `PostgresSQL`
 
 ## Установка
-1. Перед установкой создайте ENV файла по [примеру](./config/template.env).
+1. Перед установкой создайте ENV файла по [примеру](configs/template.env).
 2. Установите миграции `migrate -database <url до вашей БД> -path db/migrations/ up -all`
 3. При запуске укажите параметр `-path=<путь до env файла>`
+
+docker compose --env-file=./configs/db.env up --abort-on-container-failure -y

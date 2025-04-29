@@ -70,7 +70,7 @@ func main() {
 
 	router.Group(func(public chi.Router) {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
-		public.Get("/ws/simulate", ws.WebSocketHandler(log, cfg))
+
 	})
 
 	router.Group(func(user chi.Router) {
@@ -78,19 +78,28 @@ func main() {
 		user.Route("/parking", func(r chi.Router) {
 			r.Get("/", parking.AllParkingsHandler(log, db, cfg))
 			r.Get("/{id}", parking.GetParkingHandler(log, db, cfg))
+			r.Patch("/{id}", parking.UpdateParkingHandler(log, db, cfg))
+			r.Delete("/{id}", parking.DeleteParkingHandler(log, db, cfg))
 		})
 	})
 
 	router.Group(func(manager chi.Router) {
 		manager.Use(authMiddleware.AuthMiddleware(db))
 		manager.Use(authMiddleware.ManagerMiddleware)
+		manager.Get("/ws/simulate", ws.WebSocketHandler(log, cfg))
 	})
 
 	router.Group(func(admin chi.Router) {
 		admin.Use(authMiddleware.AuthMiddleware(db))
 		admin.Use(authMiddleware.AdminMiddleware)
-		admin.Post("/parking/add", parking.AddParkingHandler(log, db, cfg))
-		admin.Post("/create_manager", user.CreateManagerHandler(log, db, cfg))
+		admin.Post("/parking", parking.AddParkingHandler(log, db, cfg))
+		admin.Route("/manager", func(mng chi.Router) {
+			mng.Post("/", user.CreateManagerHandler(log, db, cfg))
+			mng.Get("/", user.GetManagersHandler(log, db, cfg))
+			mng.Get("/{id}", user.GetManagerByIDHandler(log, db, cfg))
+			mng.Patch("/{id}", user.UpdateManagerHandler(log, db, cfg))
+			mng.Delete("/{id}", user.DeleteManagerHandler(log, db, cfg))
+		})
 	})
 
 	// задание настроек сервера

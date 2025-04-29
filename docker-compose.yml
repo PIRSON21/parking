@@ -1,0 +1,97 @@
+version: "3.7"
+
+services:
+  db:
+    image: postgres:17-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - ${DB_PORT}
+    healthcheck:
+      test: [ "CMD-SHELL", "sh -c 'pg_isready -U parking -d parking'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    networks:
+      - postgres
+      - app
+    env_file:
+      - path: ./configs/db.env
+
+  pgadmin:
+    container_name: pgadmin_container
+    image: dpage/pgadmin4:9.2
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    depends_on:
+      - db
+    networks:
+      - postgres
+    env_file:
+      - path: ./configs/db.env
+
+  migrations:
+    container_name: db_migrations
+    image: migrate/migrate:4
+    volumes:
+      - ./db/migrations:/migrations
+    command: ["-path", "/migrations", "-database", '${MIGRATE_DATABASE_URI}', "up"]
+    links:
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - postgres
+    env_file:
+      - path: ./configs/db.env
+
+
+
+  app:
+    build:
+      dockerfile: deployments/Dockerfile
+      context: ./
+    entrypoint: [
+      "./parking", "-path=./configs/app.env"
+    ]
+    ports:
+      - "8000:8000"
+    volumes:
+      - logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    networks:
+      - postgres
+      - app
+    env_file:
+      - path: ./configs/app.env
+
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  logs:
+
+networks:
+  postgres:
+    driver: bridge
+  app:

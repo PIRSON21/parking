@@ -1,8 +1,6 @@
 package parking
 
 import (
-	"database/sql"
-	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	authMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
@@ -18,10 +16,9 @@ import (
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=ParkingGetter
 type ParkingGetter interface {
-	GetAdminParkings(search string) ([]*models.Parking, error)
-	GetManagerParkings(userID int, search string) ([]*models.Parking, error)
-	GetParkingByID(parkingID int) (*models.Parking, error)
-	GetParkingCells(parking *models.Parking) ([][]models.ParkingCell, error)
+	GetAdminParkings(string) ([]*models.Parking, error)
+	GetManagerParkings(int, string) ([]*models.Parking, error)
+	GetParkingByID(int, int) (*models.Parking, error)
 }
 
 // AllParkingsHandler обрабатывает список парковок.
@@ -126,40 +123,26 @@ func GetParkingHandler(log *slog.Logger, parkingGetter ParkingGetter, cfg *confi
 			slog.String("reqID", middleware.GetReqID(r.Context())),
 		)
 
-		id, err := getParkingID(r)
+		parkingID, err := getParkingID(r)
 		if err != nil {
 			log.Error("error while getting ID from url", slog.String("err", err.Error()))
 			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while getting ID from url: %w", op, err))
 			return
 		}
 
-		parking, err := parkingGetter.GetParkingByID(id)
+		userID := getUserID(r)
+		if userID == -1 {
+			http.NotFound(w, r)
+		}
+
+		parking, err := parkingGetter.GetParkingByID(parkingID, userID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				http.NotFound(w, r)
-				return
-			}
 			log.Error("error while getting Parking from DB", slog.String("err", err.Error()))
 			resp.ErrorHandler(w, r, cfg, err)
 			return
 		}
-
-		userID := getUserID(r)
-		if userID == -1 || (userID != 0 && userID != parking.Manager.ID) {
+		if parking == nil {
 			http.NotFound(w, r)
-			return
-		} else if userID == 0 {
-			// ничего не менять
-		} else {
-			parking.Manager = nil
-		}
-
-		parking.Cells, err = parkingGetter.GetParkingCells(parking)
-		if err != nil {
-			log.Error("error while getting cells from DB", slog.String("err", err.Error()))
-
-			resp.ErrorHandler(w, r, cfg, err)
-
 			return
 		}
 

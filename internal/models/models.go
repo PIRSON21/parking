@@ -6,13 +6,15 @@ import (
 
 // Parking - данные о парковке.
 type Parking struct {
-	ID      int             `json:"id,omitempty"`
-	Name    string          `json:"name" validate:"required,min=3,max=10"`
-	Address string          `json:"address" validate:"required,min=10,max=30"`
-	Width   int             `json:"width" validate:"required,gte=4,lte=6"`
-	Height  int             `json:"height" validate:"required,gte=4,lte=6"`
-	Cells   [][]ParkingCell `json:"cells,omitempty"`
-	Manager *Manager        `json:"manager,omitempty"`
+	ID          int             `json:"id,omitempty"`
+	Name        string          `json:"name" validate:"required,min=3,max=10"`
+	Address     string          `json:"address" validate:"required,min=10,max=30"`
+	Width       int             `json:"width" validate:"required,gte=4,lte=6"`
+	Height      int             `json:"height" validate:"required,gte=4,lte=6"`
+	DayTariff   int             `json:"day_tariff" validate:"required,gte=0,lte=1000"`
+	NightTariff int             `json:"night_tariff" validate:"required,gte=0,lte=1000"`
+	Cells       [][]ParkingCell `json:"cells,omitempty"`
+	Manager     *Manager        `json:"manager,omitempty"`
 }
 
 type Manager struct {

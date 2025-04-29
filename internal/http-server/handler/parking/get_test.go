@@ -2,8 +2,6 @@ package parking_test
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
@@ -16,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
@@ -45,24 +42,27 @@ func TestAllParkingsHandler(t *testing.T) {
 			Search: "",
 			ParkingsList: []*models.Parking{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 			},
 			GetParkingsError: nil,
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusOK,
-			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
-					URL:     "/parking/1",
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells:       [][]models.ParkingCell{},
 				},
 			}),
 			JSON: true,
@@ -72,25 +72,28 @@ func TestAllParkingsHandler(t *testing.T) {
 			Search: "",
 			ParkingsList: []*models.Parking{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 			},
 			UserID:           1,
 			GetParkingsError: nil,
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusOK,
-			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
-					URL:     "/parking/1",
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells:       [][]models.ParkingCell{},
 				},
 			}),
 			JSON: true,
@@ -100,39 +103,227 @@ func TestAllParkingsHandler(t *testing.T) {
 			Search: "",
 			ParkingsList: []*models.Parking{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 				{
-					ID:      2,
-					Name:    "2: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   4,
-					Height:  4,
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       4,
+					Height:      4,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 			},
 			GetParkingsError: nil,
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusOK,
-			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
-					URL:     "/parking/1",
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells:       [][]models.ParkingCell{},
 				},
 				{
-					ID:      2,
-					Name:    "2: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   4,
-					Height:  4,
-					URL:     "/parking/2",
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/2",
+					Cells:       [][]models.ParkingCell{},
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:   "Success with some parkings with cells as manager",
+			Search: "",
+			ParkingsList: []*models.Parking{
+				{
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
+				},
+				{
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       4,
+					Height:      4,
+					DayTariff:   5,
+					NightTariff: 1,
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
+				},
+			},
+			UserID:           1,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
+				},
+				{
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/2",
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
+				},
+			}),
+			JSON: true,
+		},
+		{
+			Name:   "Success with some parkings with cells as admin",
+			Search: "",
+			ParkingsList: []*models.Parking{
+				{
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
+				},
+				{
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       4,
+					Height:      4,
+					DayTariff:   5,
+					NightTariff: 1,
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
+				},
+			},
+			UserID:           0,
+			GetParkingsError: nil,
+			RequestURL:       urlAllParkings,
+			ResponseCode:     http.StatusOK,
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
+				{
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
+				},
+				{
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/2",
+					Cells: [][]models.ParkingCell{
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+						{
+							".", ".", ".",
+						},
+					},
 				},
 			}),
 			JSON: true,
@@ -142,40 +333,46 @@ func TestAllParkingsHandler(t *testing.T) {
 			Search: "",
 			ParkingsList: []*models.Parking{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 				{
-					ID:      2,
-					Name:    "2: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   4,
-					Height:  4,
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       4,
+					Height:      4,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 			},
 			UserID:           1,
 			GetParkingsError: nil,
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusOK,
-			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
 				{
-					ID:      1,
-					Name:    "1: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
-					URL:     "/parking/1",
+					ID:          1,
+					Name:        "1: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells:       [][]models.ParkingCell{},
 				},
 				{
-					ID:      2,
-					Name:    "2: Центр",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   4,
-					Height:  4,
-					URL:     "/parking/2",
+					ID:          2,
+					Name:        "2: Центр",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/2",
+					Cells:       [][]models.ParkingCell{},
 				},
 			}),
 			JSON: true,
@@ -185,24 +382,27 @@ func TestAllParkingsHandler(t *testing.T) {
 			Search: "aboba",
 			ParkingsList: []*models.Parking{
 				{
-					ID:      1,
-					Name:    "1: aboba",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
+					ID:          1,
+					Name:        "1: aboba",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 			},
 			GetParkingsError: nil,
 			RequestURL:       fmt.Sprint(urlAllParkings + "?search=aboba"),
 			ResponseCode:     http.StatusOK,
-			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
 				{
-					ID:      1,
-					Name:    "1: aboba",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
-					URL:     "/parking/1",
+					ID:          1,
+					Name:        "1: aboba",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells:       [][]models.ParkingCell{},
 				},
 			}),
 			JSON: true,
@@ -212,25 +412,28 @@ func TestAllParkingsHandler(t *testing.T) {
 			Search: "aboba",
 			ParkingsList: []*models.Parking{
 				{
-					ID:      1,
-					Name:    "1: aboba",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
+					ID:          1,
+					Name:        "1: aboba",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					Width:       5,
+					Height:      5,
+					DayTariff:   5,
+					NightTariff: 1,
 				},
 			},
 			UserID:           1,
 			GetParkingsError: nil,
 			RequestURL:       fmt.Sprint(urlAllParkings + "?search=aboba"),
 			ResponseCode:     http.StatusOK,
-			ResponseBody: mustMarshalResponse([]resp.ParkingResponse{
+			ResponseBody: test.MustMarshalResponse([]resp.ParkingResponse{
 				{
-					ID:      1,
-					Name:    "1: aboba",
-					Address: "ул. Пушкина, д. Колотушкина",
-					Width:   5,
-					Height:  5,
-					URL:     "/parking/1",
+					ID:          1,
+					Name:        "1: aboba",
+					Address:     "ул. Пушкина, д. Колотушкина",
+					DayTariff:   5,
+					NightTariff: 1,
+					URL:         "/parking/1",
+					Cells:       [][]models.ParkingCell{},
 				},
 			}),
 			JSON: true,
@@ -317,7 +520,6 @@ func TestAllParkingsHandler(t *testing.T) {
 				return
 			}
 
-			assert.Fail(t, "прописаны не все проверки")
 		})
 	}
 }
@@ -385,7 +587,7 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusOK,
 			GetParkingError: nil,
 			GetCellsError:   nil,
-			ResponseBody: mustMarshalResponse(&models.Parking{
+			ResponseBody: test.MustMarshalResponse(&models.Parking{
 				ID:      1,
 				Name:    "1: Центр",
 				Address: "ул. Пушкина, д. Колотушкина",
@@ -421,13 +623,15 @@ func TestGetParkingHandler(t *testing.T) {
 			ResponseCode:    http.StatusOK,
 			GetParkingError: nil,
 			GetCellsError:   nil,
-			ResponseBody: mustMarshalResponse(&models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
+			ResponseBody: test.MustMarshalResponse(&models.Parking{
+				ID:          2,
+				Name:        "1: Центр",
+				Address:     "ул. Пушкина, д. Колотушкина",
+				Width:       4,
+				Height:      4,
+				DayTariff:   0,
+				NightTariff: 0,
+				Cells:       nil,
 			}),
 			JSON: true,
 		},
@@ -450,12 +654,14 @@ func TestGetParkingHandler(t *testing.T) {
 		{
 			Name: "Error while getting from DB on Prod",
 			Parking: &models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
+				ID:          2,
+				Name:        "1: Центр",
+				Address:     "ул. Пушкина, д. Колотушкина",
+				Width:       4,
+				Height:      4,
+				DayTariff:   0,
+				NightTariff: 0,
+				Cells:       nil,
 			},
 			ResponseCode:    http.StatusInternalServerError,
 			GetParkingError: fmt.Errorf("db: error getting from DB"),
@@ -468,112 +674,40 @@ func TestGetParkingHandler(t *testing.T) {
 			Name:            "Success not found",
 			Parking:         nil,
 			ResponseCode:    http.StatusNotFound,
-			GetParkingError: sql.ErrNoRows,
+			GetParkingError: nil,
 			GetCellsError:   nil,
 			ResponseBody:    test.NotFound,
 			JSON:            false,
-		},
-		{
-			Name: "Error while getting cells on Dev",
-			Parking: &models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
-			},
-			ResponseCode:    http.StatusInternalServerError,
-			GetParkingError: nil,
-			GetCellsError:   fmt.Errorf("cells: error while getting cells"),
-			ResponseBody:    fmt.Sprintf(test.ExpectedError, "cells: error while getting cells"),
-			JSON:            true,
-		},
-		{
-			Name: "Error while getting cells on Prod",
-			Parking: &models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
-			},
-			ResponseCode:    http.StatusInternalServerError,
-			GetParkingError: nil,
-			GetCellsError:   fmt.Errorf("cells: error while getting cells"),
-			Environment:     test.EnvProd,
-			ResponseBody:    test.InternalServerErrorMessage,
-			JSON:            false,
-		},
-		{
-			Name: "Success get parking with manager to manager",
-			Parking: &models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
-				Manager: &models.Manager{ID: 1},
-			},
-			ResponseCode:    http.StatusOK,
-			GetParkingError: nil,
-			GetCellsError:   nil,
-			JSON:            true,
-			ResponseBody: mustMarshalResponse(&models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
-			}),
-			UserID: 1,
 		},
 		{
 			Name: "Success get parking with manager to admin",
 			Parking: &models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
-				Manager: &models.Manager{ID: 1},
+				ID:          2,
+				Name:        "1: Центр",
+				Address:     "ул. Пушкина, д. Колотушкина",
+				Width:       4,
+				Height:      4,
+				DayTariff:   1,
+				NightTariff: 2,
+				Cells:       nil,
+				Manager:     &models.Manager{ID: 1},
 			},
 			ResponseCode:    http.StatusOK,
 			GetParkingError: nil,
 			GetCellsError:   nil,
 			JSON:            true,
-			ResponseBody: mustMarshalResponse(&models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
-				Manager: &models.Manager{ID: 1},
+			ResponseBody: test.MustMarshalResponse(&models.Parking{
+				ID:          2,
+				Name:        "1: Центр",
+				Address:     "ул. Пушкина, д. Колотушкина",
+				Width:       4,
+				DayTariff:   1,
+				NightTariff: 2,
+				Height:      4,
+				Cells:       nil,
+				Manager:     &models.Manager{ID: 1},
 			}),
 			UserID: 0,
-		},
-		{
-			Name: "Success not allowed parking for manager",
-			Parking: &models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
-				Manager: &models.Manager{ID: 2},
-			},
-			ResponseCode:    http.StatusNotFound,
-			GetParkingError: nil,
-			GetCellsError:   nil,
-			JSON:            false,
-			ResponseBody:    test.NotFound,
-			UserID:          1,
 		},
 	}
 
@@ -585,27 +719,16 @@ func TestGetParkingHandler(t *testing.T) {
 			parkingGetterMock := mocks.NewParkingGetter(t)
 			if tc.Parking != nil {
 				// Если нужны данные парковки
-				parkingGetterMock.On("GetParkingByID", tc.Parking.ID).
-					Return(&models.Parking{
-						ID:      tc.Parking.ID,
-						Name:    tc.Parking.Name,
-						Address: tc.Parking.Address,
-						Width:   tc.Parking.Width,
-						Height:  tc.Parking.Height,
-						Manager: tc.Parking.Manager,
-					}, tc.GetParkingError).
+				parkingGetterMock.On("GetParkingByID", tc.Parking.ID, tc.UserID).
+					Return(tc.Parking, tc.GetParkingError).
 					Once()
 			} else {
 				// Если парковка не нужна, задает структура только для отправки запроса по ID
 				tc.Parking = &models.Parking{ID: 1}
-				parkingGetterMock.On("GetParkingByID", tc.Parking.ID).
+				parkingGetterMock.On("GetParkingByID", tc.Parking.ID, tc.UserID).
 					Return(nil, tc.GetParkingError).
 					Once()
 			}
-
-			parkingGetterMock.On("GetParkingCells", mock.AnythingOfType("*models.Parking")).
-				Return(tc.Parking.Cells, tc.GetCellsError).
-				Maybe()
 
 			requestURL := fmt.Sprintf(urlCurrentParking, tc.Parking.ID)
 
@@ -638,17 +761,6 @@ func TestGetParkingHandler(t *testing.T) {
 				assert.Equal(t, tc.ResponseBody, body)
 				return
 			}
-
-			assert.Fail(t, "для этого кейса не предусмотрен тест")
 		})
 	}
-}
-
-func mustMarshalResponse(v interface{}) string {
-	var res []byte
-	res, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return string(res)
 }

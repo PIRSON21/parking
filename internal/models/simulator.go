@@ -17,10 +17,12 @@ type ParkingSpot struct {
 
 // ParkingLot отражает топологию парковки.
 type ParkingLot struct {
-	mu     sync.Mutex
-	spots  []*ParkingSpot
-	EntryX int
-	EntryY int
+	mu          sync.Mutex
+	spots       []*ParkingSpot
+	EntryX      int
+	EntryY      int
+	DayTariff   float64
+	NightTariff float64
 }
 
 // NewParkingLot создает модель парковки для сессии.
@@ -49,9 +51,11 @@ func NewParkingLot(parking *Parking) *ParkingLot {
 	}
 
 	return &ParkingLot{
-		spots:  spots,
-		EntryX: entryX,
-		EntryY: entryY,
+		spots:       spots,
+		EntryX:      entryX,
+		EntryY:      entryY,
+		DayTariff:   float64(parking.DayTariff),
+		NightTariff: float64(parking.NightTariff),
 	}
 }
 

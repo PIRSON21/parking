@@ -2,19 +2,24 @@ package user_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user/mocks"
+	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	customErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
 	"github.com/PIRSON21/parking/internal/lib/test"
 	"github.com/PIRSON21/parking/internal/models"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 )
 
@@ -240,8 +245,6 @@ func TestLoginHandler(t *testing.T) {
 
 				return
 			}
-
-			assert.Fail(t, "не все проверки прописаны")
 		})
 	}
 }
@@ -257,10 +260,6 @@ func findSessionCookie(rr *httptest.ResponseRecorder) bool {
 
 	return false
 }
-
-const (
-	createManagerURL = "/create_manager"
-)
 
 func TestCreateManagerHandler(t *testing.T) {
 	cases := []struct {
@@ -412,7 +411,7 @@ func TestCreateManagerHandler(t *testing.T) {
 				Password: "aboba",
 				Email:    "aboba@mail.ru",
 			}),
-			ResponseCode: http.StatusInternalServerError,
+			ResponseCode: http.StatusConflict,
 			JSON:         true,
 			ResponseBody: fmt.Sprintf(test.ExpectedError, "такой менеджер уже существует"),
 		},
@@ -452,7 +451,7 @@ func TestCreateManagerHandler(t *testing.T) {
 				Maybe()
 
 			reqBody := bytes.NewReader(tc.RequestBody)
-			req := httptest.NewRequest(http.MethodPost, createManagerURL, reqBody)
+			req := httptest.NewRequest(http.MethodPost, "/manager", reqBody)
 
 			rr := httptest.NewRecorder()
 
@@ -463,21 +462,478 @@ func TestCreateManagerHandler(t *testing.T) {
 			}
 
 			user.CreateManagerHandler(log, userSetterMock, cfg).ServeHTTP(rr, req)
-			require.Equal(t, tc.ResponseCode, rr.Code)
+			assert.Equal(t, tc.ResponseCode, rr.Code)
 
 			respBody := rr.Body.String()
 
 			if tc.JSON {
 				assert.JSONEq(t, tc.ResponseBody, respBody)
-
-				return
 			} else {
 				assert.Equal(t, tc.ResponseBody, respBody)
+			}
+		})
+	}
+}
 
-				return
+func TestDeleteManagerHandler(t *testing.T) {
+	cases := []struct {
+		Name               string
+		ManagerID          int
+		ManagerIDStr       string
+		DeleteManagerError error
+		Environment        string
+		StatusCode         int
+		JSON               bool
+		ResponseBody       string
+	}{
+		{
+			Name:               "Success",
+			ManagerID:          2,
+			DeleteManagerError: nil,
+			StatusCode:         http.StatusNoContent,
+			JSON:               false,
+			ResponseBody:       "",
+		},
+		{
+			Name:               "Not int id on prod",
+			ManagerID:          0,
+			ManagerIDStr:       "aboba",
+			DeleteManagerError: nil,
+			Environment:        "prod",
+			StatusCode:         http.StatusBadRequest,
+			JSON:               true,
+			ResponseBody:       fmt.Sprintf(test.ExpectedError, user.InvalidManagerIndex.Error()),
+		},
+		{
+			Name:               "Not int id on dev",
+			ManagerID:          0,
+			ManagerIDStr:       "aboba",
+			DeleteManagerError: nil,
+			StatusCode:         http.StatusBadRequest,
+			JSON:               true,
+			ResponseBody:       fmt.Sprintf(test.ExpectedError, user.InvalidManagerIndex.Error()),
+		},
+		{
+			Name:               "DB error on prod",
+			ManagerID:          5,
+			DeleteManagerError: fmt.Errorf("aboba"),
+			Environment:        "prod",
+			StatusCode:         http.StatusInternalServerError,
+			JSON:               false,
+			ResponseBody:       test.InternalServerErrorMessage,
+		},
+		{
+			Name:               "DB error on dev",
+			ManagerID:          5,
+			DeleteManagerError: fmt.Errorf("aboba"),
+			StatusCode:         http.StatusInternalServerError,
+			JSON:               true,
+			ResponseBody:       fmt.Sprintf(test.ExpectedError, "aboba"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			userSetterMock := mocks.NewUserSetter(t)
+			userSetterMock.On("DeleteManager", tc.ManagerID).
+				Return(tc.DeleteManagerError).
+				Maybe()
+
+			if tc.ManagerIDStr == "" {
+				tc.ManagerIDStr = strconv.Itoa(tc.ManagerID)
+			}
+			r := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, fmt.Sprintf("/manager/%s", tc.ManagerIDStr), nil)
+
+			rec := httptest.NewRecorder()
+
+			log := slogdiscard.NewDiscardLogger()
+			cfg := &config.Config{}
+			if tc.Environment != "" {
+				cfg.Environment = tc.Environment
 			}
 
-			assert.Fail(t, "не все тесты прописаны")
+			router := chi.NewRouter()
+			router.Use(middleware.URLFormat)
+			router.Delete("/manager/{id}", user.DeleteManagerHandler(log, userSetterMock, cfg))
+			router.ServeHTTP(rec, r)
+
+			assert.Equal(t, tc.StatusCode, rec.Code)
+
+			body := rec.Body.String()
+
+			if tc.JSON {
+				assert.JSONEq(t, tc.ResponseBody, body)
+				return
+			} else {
+				assert.Equal(t, tc.ResponseBody, body)
+				return
+			}
+		})
+	}
+}
+
+func TestGetManagerByIDHandler(t *testing.T) {
+	cases := []struct {
+		Name             string
+		ManagerID        int
+		ManagerIDStr     string
+		ManagerByID      *models.User
+		ManagerByIDError error
+		Environment      string
+		StatusCode       int
+		JSON             bool
+		ResponseBody     string
+	}{
+		{
+			Name:      "Success",
+			ManagerID: 1,
+			ManagerByID: &models.User{
+				ID:    1,
+				Login: "aboba",
+				Email: "aboba@cheer.com",
+			},
+			StatusCode: http.StatusOK,
+			JSON:       true,
+			ResponseBody: test.MustMarshalResponse(resp.ManagerResponse{
+				ID:    1,
+				Login: "aboba",
+				Email: "aboba@cheer.com",
+				URL:   "/manager/1",
+			}),
+		},
+		{
+			Name:         "No such manager",
+			ManagerID:    5,
+			StatusCode:   http.StatusNotFound,
+			ResponseBody: test.NotFound,
+		},
+		{
+			Name:         "Wrong id",
+			ManagerIDStr: "aboba",
+			Environment:  "prod",
+			StatusCode:   http.StatusBadRequest,
+			JSON:         true,
+			ResponseBody: fmt.Sprintf(test.ExpectedError, user.InvalidManagerIndex.Error()),
+		},
+		{
+			Name:             "DB error on prod",
+			ManagerID:        2,
+			ManagerByIDError: fmt.Errorf("aboba"),
+			Environment:      "prod",
+			StatusCode:       http.StatusInternalServerError,
+			JSON:             false,
+			ResponseBody:     test.InternalServerErrorMessage,
+		},
+		{
+			Name:             "DB error on dev",
+			ManagerID:        2,
+			ManagerByIDError: fmt.Errorf("aboba"),
+			StatusCode:       http.StatusInternalServerError,
+			JSON:             true,
+			ResponseBody:     fmt.Sprintf(test.ExpectedError, "aboba"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			userGetterMock := mocks.NewUserGetter(t)
+			userGetterMock.On("GetManagerByID", tc.ManagerID).
+				Return(tc.ManagerByID, tc.ManagerByIDError).
+				Maybe()
+
+			if tc.ManagerIDStr == "" {
+				tc.ManagerIDStr = strconv.Itoa(tc.ManagerID)
+			}
+			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("/manager/%s", tc.ManagerIDStr), nil)
+
+			rec := httptest.NewRecorder()
+
+			log := slogdiscard.NewDiscardLogger()
+
+			cfg := &config.Config{}
+			if tc.Environment != "" {
+				cfg.Environment = tc.Environment
+			}
+
+			router := chi.NewRouter()
+			router.Use(middleware.URLFormat)
+			router.Get("/manager/{id}", user.GetManagerByIDHandler(log, userGetterMock, cfg))
+
+			router.ServeHTTP(rec, r)
+			assert.Equal(t, tc.StatusCode, rec.Code)
+
+			body := rec.Body.String()
+
+			if tc.JSON {
+				assert.JSONEq(t, tc.ResponseBody, body)
+				return
+			} else {
+				assert.Equal(t, tc.ResponseBody, body)
+				return
+			}
+		})
+	}
+}
+
+func TestGetManagersHandler(t *testing.T) {
+	cases := []struct {
+		Name             string
+		Managers         []*models.User
+		GetManagersError error
+		Environment      string
+		StatusCode       int
+		JSON             bool
+		ResponseBody     string
+	}{
+		{
+			Name: "Success",
+			Managers: []*models.User{
+				{
+					ID:    1,
+					Login: "aboba",
+					Email: "aboba@mail.ru",
+				},
+				{
+					ID:    2,
+					Login: "aboba2",
+					Email: "aboba2@mail.ru",
+				},
+			},
+			GetManagersError: nil,
+			StatusCode:       http.StatusOK,
+			JSON:             true,
+			ResponseBody: test.MustMarshalResponse([]resp.ManagerResponse{
+				{
+					ID:    1,
+					Login: "aboba",
+					Email: "aboba@mail.ru",
+					URL:   "/manager/1",
+				},
+				{
+					ID:    2,
+					Login: "aboba2",
+					Email: "aboba2@mail.ru",
+					URL:   "/manager/2",
+				},
+			}),
+		},
+		{
+			Name: "Success with one manager",
+			Managers: []*models.User{
+				{
+					ID:    1,
+					Login: "aboba",
+					Email: "aboba@mail.ru",
+				},
+			},
+			GetManagersError: nil,
+			StatusCode:       http.StatusOK,
+			JSON:             true,
+			ResponseBody: test.MustMarshalResponse([]resp.ManagerResponse{
+				{
+					ID:    1,
+					Login: "aboba",
+					Email: "aboba@mail.ru",
+					URL:   "/manager/1",
+				},
+			}),
+		},
+		{
+			Name:             "No any one",
+			Managers:         nil,
+			GetManagersError: nil,
+			StatusCode:       http.StatusOK,
+			JSON:             true,
+			ResponseBody:     "[]",
+		},
+		{
+			Name:             "DB error on prod",
+			Managers:         nil,
+			GetManagersError: fmt.Errorf("aboba"),
+			Environment:      "prod",
+			StatusCode:       http.StatusInternalServerError,
+			JSON:             false,
+			ResponseBody:     test.InternalServerErrorMessage,
+		},
+		{
+			Name:             "DB error on dev",
+			Managers:         nil,
+			GetManagersError: fmt.Errorf("aboba"),
+			StatusCode:       http.StatusInternalServerError,
+			JSON:             true,
+			ResponseBody:     fmt.Sprintf(test.ExpectedError, "aboba"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			userGetterMock := mocks.NewUserGetter(t)
+			userGetterMock.On("GetManagers").
+				Return(tc.Managers, tc.GetManagersError).
+				Once()
+
+			r := httptest.NewRequest(http.MethodGet, "/manager", nil)
+
+			rec := httptest.NewRecorder()
+
+			cfg := &config.Config{}
+			if tc.Environment != "" {
+				cfg.Environment = tc.Environment
+			}
+
+			log := slogdiscard.NewDiscardLogger()
+
+			user.GetManagersHandler(log, userGetterMock, cfg).ServeHTTP(rec, r)
+			assert.Equal(t, tc.StatusCode, rec.Code)
+
+			body := rec.Body.String()
+
+			if tc.JSON {
+				assert.JSONEq(t, tc.ResponseBody, body)
+				return
+			} else {
+				assert.Equal(t, tc.ResponseBody, body)
+				return
+			}
+		})
+	}
+}
+
+func TestUpdateManagerHandler(t *testing.T) {
+
+	cases := []struct {
+		Name               string
+		ManagerID          int
+		ManagerIDStr       string
+		ManagerUpdated     *models.User
+		RequestBody        []byte
+		Environment        string
+		StatusCode         int
+		JSON               bool
+		ResponseBody       string
+		UpdateManagerError error
+	}{
+		{
+			Name:      "Success",
+			ManagerID: 5,
+			ManagerUpdated: &models.User{
+				ID:       5,
+				Login:    "aboba2",
+				Password: "aboba2",
+				Email:    "aboba2@ab.com",
+			},
+			RequestBody: test.MustMarshal(map[string]string{
+				"login":    "aboba2",
+				"email":    "aboba2@ab.com",
+				"password": "aboba2",
+			}),
+			StatusCode: http.StatusOK,
+			JSON:       true,
+			ResponseBody: test.MustMarshalResponse(&resp.ManagerResponse{
+				ID:    5,
+				Login: "aboba2",
+				Email: "aboba2@ab.com",
+				URL:   "/manager/5",
+			}),
+		},
+		{
+			Name:      "Wrong validation",
+			ManagerID: 5,
+			ManagerUpdated: &models.User{
+				ID:       5,
+				Login:    "aboba2",
+				Password: "aboba2",
+				Email:    "aboba2@ab.com",
+			},
+			RequestBody: test.MustMarshal(map[string]string{
+				"login": "aaaaaaaaaaaaaaaaaaaaaa",
+			}),
+			StatusCode:   http.StatusBadRequest,
+			JSON:         true,
+			ResponseBody: fmt.Sprintf(test.ExpectedValidationError, "login", fmt.Sprintf(test.Max, 8)),
+		},
+		{
+			Name:      "Update error on dev",
+			ManagerID: 5,
+			ManagerUpdated: &models.User{
+				ID:       5,
+				Login:    "aboba2",
+				Password: "aboba2",
+				Email:    "aboba2@ab.com",
+			},
+			RequestBody: test.MustMarshal(map[string]string{
+				"login":    "aboba2",
+				"email":    "aboba2@ab.com",
+				"password": "aboba2",
+			}),
+			UpdateManagerError: fmt.Errorf("aboba"),
+			StatusCode:         http.StatusInternalServerError,
+			JSON:               true,
+			ResponseBody:       fmt.Sprintf(test.ExpectedError, "aboba"),
+		},
+		{
+			Name:      "Update error on prod",
+			ManagerID: 5,
+			ManagerUpdated: &models.User{
+				ID:       5,
+				Login:    "aboba2",
+				Password: "aboba2",
+				Email:    "aboba2@ab.com",
+			},
+			RequestBody: test.MustMarshal(map[string]string{
+				"login":    "aboba2",
+				"email":    "aboba2@ab.com",
+				"password": "aboba2",
+			}),
+			UpdateManagerError: fmt.Errorf("aboba"),
+			Environment:        "prod",
+			StatusCode:         http.StatusInternalServerError,
+			JSON:               false,
+			ResponseBody:       test.InternalServerErrorMessage,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			userSetterMock := mocks.NewUserSetter(t)
+			userSetterMock.On("GetManagerByID", tc.ManagerID).
+				Return(tc.ManagerUpdated, nil).
+				Maybe()
+
+			userSetterMock.On("UpdateManager", mock.AnythingOfType("*user.UserPatch")).
+				Return(tc.UpdateManagerError).
+				Maybe()
+
+			reqBody := bytes.NewReader(tc.RequestBody)
+
+			if tc.ManagerIDStr == "" {
+				tc.ManagerIDStr = strconv.Itoa(tc.ManagerID)
+			}
+			r := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/manager/%s", tc.ManagerIDStr), reqBody)
+
+			rec := httptest.NewRecorder()
+
+			log := slogdiscard.NewDiscardLogger()
+
+			cfg := &config.Config{}
+			if tc.Environment != "" {
+				cfg.Environment = tc.Environment
+			}
+
+			router := chi.NewRouter()
+			router.Use(middleware.URLFormat)
+			router.Patch("/manager/{id}", user.UpdateManagerHandler(log, userSetterMock, cfg))
+
+			router.ServeHTTP(rec, r)
+			assert.Equal(t, tc.StatusCode, rec.Code)
+
+			respBody := rec.Body.String()
+
+			if tc.JSON {
+				assert.JSONEq(t, tc.ResponseBody, respBody)
+			} else {
+				assert.Equal(t, tc.ResponseBody, respBody)
+			}
 		})
 	}
 }

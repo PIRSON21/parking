@@ -2,9 +2,12 @@ package postgresql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
+	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
+	"github.com/PIRSON21/parking/internal/http-server/handler/user"
 	"github.com/PIRSON21/parking/internal/lib/api/request"
 	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/models"
@@ -26,8 +29,8 @@ type Storage struct {
 // Остальные параметры стандартные
 func MustConnectDB(cfg *config.Config) *Storage {
 	connStr := fmt.Sprintf(
-		"user='%s' dbname='%s' password='%s' sslmode=disable",
-		cfg.DBUsername, cfg.DBName, cfg.DBPassword,
+		"user='%s' dbname='%s' password='%s' host='%s' sslmode=disable",
+		cfg.DBUsername, cfg.DBName, cfg.DBPassword, cfg.DBHost,
 	)
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
@@ -46,7 +49,7 @@ func MustConnectDB(cfg *config.Config) *Storage {
 func (s *Storage) GetAdminParkings(search string) ([]*models.Parking, error) {
 	query := `
 			SELECT 
-			    parking_id, parking_name, parking_address, parking_width, parking_height 
+			    parking_id, parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology 
 			FROM parkings
 			WHERE parking_name ILIKE $1
     `
@@ -58,7 +61,7 @@ func (s *Storage) GetAdminParkings(search string) ([]*models.Parking, error) {
 func (s *Storage) GetManagerParkings(userID int, search string) ([]*models.Parking, error) {
 	query := `
 			SELECT 
-			    parking_id, parking_name, parking_address, parking_width, parking_height 
+			    parking_id, parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology
 			FROM parkings
 			WHERE parking_name ILIKE $1 AND manager_id = $2
     `
@@ -89,10 +92,15 @@ func (s *Storage) fetchParkings(query string, args ...interface{}) ([]*models.Pa
 
 	for rows.Next() {
 		var parking models.Parking
+		var topology string
 
-		err = rows.Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height)
+		err = rows.Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &parking.DayTariff, &parking.NightTariff, &topology)
 		if err != nil {
 			log.Printf("%s: error while reading rows: %v", op, err)
+		}
+
+		if err = json.Unmarshal([]byte(topology), &parking.Cells); err != nil {
+			log.Printf("%s: error while unmarshalling topology %q: %v", op, topology, err)
 		}
 
 		resParking = append(resParking, &parking)
@@ -105,55 +113,74 @@ func (s *Storage) fetchParkings(query string, args ...interface{}) ([]*models.Pa
 	return resParking, nil
 }
 
-// AddParking добавляет данные о парковке в БД.
+// AddParking добавляет данные о парковке в БД вместе с клетками (если они есть).
 func (s *Storage) AddParking(parking *models.Parking) error {
 	const op = "storage.postgresql.AddParking"
 
+	tx, err := s.db.Begin()
+
 	stmt, err := s.db.Prepare(`
-		INSERT INTO parkings (parking_name, parking_address, parking_width, parking_height)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO parkings (parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING parking_id;
 	`)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
-	err = stmt.QueryRow(parking.Name, parking.Address, parking.Width, parking.Height).Scan(&parking.ID)
+	topology, err := json.Marshal(&parking.Cells)
 	if err != nil {
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		topology = []byte("[]")
 	}
 
-	return nil
+	err = stmt.QueryRow(&parking.Name, &parking.Address, &parking.Width, &parking.Height, &parking.DayTariff, &parking.NightTariff, &topology).Scan(&parking.ID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+	return tx.Commit()
 }
 
 // GetParkingByID получает всю информацию (что хранится в таблице парковки) о парковке из БД..
 //
 // Возвращает указатель на модель парковки или ошибку.
-func (s *Storage) GetParkingByID(parkingID int) (*models.Parking, error) {
+func (s *Storage) GetParkingByID(parkingID int, userID int) (*models.Parking, error) {
 	const op = "storage.postgresql.GetParkingById"
 
 	stmt, err := s.db.Prepare(`
 	SELECT 
-	    parking_id, parking_name, parking_address, parking_width, parking_height, manager_id
+	    parking_id, parking_name, parking_address, parking_width, parking_height, manager_id, day_tariff, night_tariff, parking_topology 
 	FROM parkings
 	WHERE parking_id = $1;
-`)
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
+	var topology string
 	var parking models.Parking
 	var managerID sql.NullInt64
-	if err = stmt.QueryRow(parkingID).Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &managerID); err != nil {
+	if err = stmt.QueryRow(parkingID).Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &managerID, &parking.DayTariff, &parking.NightTariff, &topology); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, err
+			return nil, nil
 		}
 
 		return nil, fmt.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
+	if err = json.Unmarshal([]byte(topology), &parking.Cells); err != nil {
+		return nil, fmt.Errorf("%s: error while unmarshalling parking topology: %w", op, err)
+	}
+
 	if managerID.Valid {
-		parking.Manager = &models.Manager{ID: int(managerID.Int64)}
+		manID := int(managerID.Int64)
+		if userID != 0 && manID != userID {
+			return nil, nil
+		}
+		if userID != manID {
+			parking.Manager = &models.Manager{ID: manID}
+		}
 	}
 
 	return &parking, nil
@@ -162,7 +189,7 @@ func (s *Storage) GetParkingByID(parkingID int) (*models.Parking, error) {
 // GetParkingCells получает данные о клетках из базы данных и на основе строит матрицу топологии парковки
 //
 //goland:noinspection t
-func (s *Storage) GetParkingCells(parking *models.Parking) ([][]models.ParkingCell, error) {
+func (s *Storage) GetParkingCells(parking *models.Parking) error {
 	op := "storage.postgresql.GetParkingCells"
 
 	width := parking.Width
@@ -183,16 +210,16 @@ func (s *Storage) GetParkingCells(parking *models.Parking) ([][]models.ParkingCe
 		WHERE parking_id = $1;
 	`)
 	if err != nil {
-		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	rows, err := stmt.Query(parking.ID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil
 		}
 
-		return nil, fmt.Errorf("%s: error while getting result from DB: %w", op, err)
+		return fmt.Errorf("%s: error while getting result from DB: %w", op, err)
 	}
 
 	defer rows.Close()
@@ -206,10 +233,8 @@ func (s *Storage) GetParkingCells(parking *models.Parking) ([][]models.ParkingCe
 		var cellType models.ParkingCell
 
 		if err = rows.Scan(&x, &y, &cellType); err != nil {
-			return nil, fmt.Errorf("%s: error while scanning result to var: %w", op, err)
+			return fmt.Errorf("%s: error while scanning result to var: %w", op, err)
 		}
-
-		fmt.Println(cellType)
 
 		if x < 0 || x >= height || y < 0 || y >= width {
 			continue
@@ -218,47 +243,16 @@ func (s *Storage) GetParkingCells(parking *models.Parking) ([][]models.ParkingCe
 		parkingCells[y][x] = cellType
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("%s: error after scanning rows: %w", op, err)
+		return fmt.Errorf("%s: error after scanning rows: %w", op, err)
 	}
 
 	if !found {
-		return nil, nil
-	}
-
-	return parkingCells, nil
-
-}
-
-// AddCellsForParking добавляет информацию о клетках топологии парковки.
-func (s *Storage) AddCellsForParking(parking *models.Parking, cells []*models.ParkingCellStruct) error {
-	const op = "storage.postgresql.AddCellsForParking"
-
-	if len(cells) == 0 {
 		return nil
 	}
 
-	valueStrings := make([]string, 0, len(cells))
-	valueArgs := make([]interface{}, 0, len(cells)*3)
-
-	for i, cell := range cells {
-		valueStrings = append(valueStrings, fmt.Sprintf("(%d, $%d, $%d, $%d)", parking.ID, i*3+1, i*3+2, i*3+3))
-		valueArgs = append(valueArgs, cell.X, cell.Y, cell.CellType)
-	}
-
-	query := fmt.Sprintf(
-		"INSERT INTO parking_cell (parking_id, x, y, cell_type) VALUES %s ON CONFLICT (parking_id, x, y) DO UPDATE SET cell_type = EXCLUDED.cell_type",
-		strings.Join(valueStrings, ", "),
-	)
-
-	fmt.Println(query)
-	fmt.Println(valueArgs)
-
-	_, err := s.db.Exec(query, valueArgs...)
-	if err != nil {
-		return fmt.Errorf("%s: error while executing query: %w", op, err)
-	}
-
+	parking.Cells = parkingCells
 	return nil
+
 }
 
 // GetUserID получает и проверяет актуальность сессии, и возвращает id пользователя.
@@ -270,7 +264,7 @@ func (s *Storage) GetUserID(sessionID string) (int, error) {
 	stmt, err := s.db.Prepare(`
 	SELECT user_id, deadline 
 	FROM user_session 
-	WHERE session_id = $1;
+	WHERE session_id = $1 AND deadline > now();
 	`)
 	if err != nil {
 		return 0, fmt.Errorf("%s: error while preparing statement: %w", op, err)
@@ -286,10 +280,6 @@ func (s *Storage) GetUserID(sessionID string) (int, error) {
 		}
 
 		return 0, fmt.Errorf("%s: error while getting row: %w", op, err)
-	}
-
-	if time.Now().After(deadline) {
-		return 0, custErr.ErrSessionExpired
 	}
 
 	if userID.Valid {
@@ -342,8 +332,6 @@ func (s *Storage) SetSessionID(userID int, sessionID string) error {
 		queryID.Valid = true
 	}
 
-	fmt.Println(queryID)
-
 	stmt, err := s.db.Prepare(`
 	INSERT INTO user_session(session_id, user_id, deadline)
 	VALUES ($1, $2, $3);
@@ -385,7 +373,7 @@ func (s *Storage) CreateNewManager(manager *request.UserCreate) error {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" {
-				return pgErr
+				return custErr.ErrManagerAlreadyExists
 			}
 		}
 
@@ -402,4 +390,254 @@ func createPasswordHash(password string) (string, error) {
 	}
 
 	return string(pass), nil
+}
+
+func (s *Storage) GetManagers() ([]*models.User, error) {
+	const op = "storage.postgresql.GetManagers"
+
+	stmt, err := s.db.Prepare(`
+	SELECT manager_id, manager_login, manager_email
+	FROM manager `)
+	if err != nil {
+		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	rows, err := stmt.Query()
+	defer rows.Close()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("%s: error while getting rows: %w", op, err)
+	}
+
+	var managers []*models.User
+
+	for rows.Next() {
+		manager := new(models.User)
+		err = rows.Scan(&manager.ID, &manager.Login, &manager.Email)
+		if err != nil {
+			return nil, fmt.Errorf("%s: error while reading rows: %w", op, err)
+		}
+		managers = append(managers, manager)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("%s: error with rows: %w", op, err)
+	}
+
+	return managers, nil
+}
+
+func (s *Storage) GetManagerByID(managerID int) (*models.User, error) {
+	const op = "storage.postgresql.GetManagerByID"
+
+	stmt, err := s.db.Prepare(`
+	SELECT manager_id, manager_login, manager_email
+	FROM manager
+	WHERE manager_id = $1
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	var manager models.User
+
+	if err := stmt.QueryRow(managerID).Scan(&manager.ID, &manager.Login, &manager.Email); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("%s: error while reading rows: %w", op, err)
+	}
+
+	return &manager, nil
+}
+
+// UpdateManager обновляет данные о менеджере в БД.
+func (s *Storage) UpdateManager(manager *user.UserPatch) error {
+	const op = "storage.postgresql.UpdateManager"
+
+	query := "UPDATE manager SET "
+	var updates []string
+	var args []interface{}
+	argIdx := 1
+
+	if manager.Login != nil {
+		updates = append(updates, fmt.Sprintf("manager_login = $%d", argIdx))
+		args = append(args, manager.Login)
+		argIdx++
+	}
+
+	if manager.Email != nil {
+		updates = append(updates, fmt.Sprintf("manager_email = $%d", argIdx))
+		args = append(args, manager.Email)
+		argIdx++
+	}
+
+	if manager.Password != nil {
+		updates = append(updates, fmt.Sprintf("manager_password = $%d", argIdx))
+		hashedPassword, err := createPasswordHash(*manager.Password)
+		if err != nil {
+			return fmt.Errorf("%s: error while hashing password: %w", op, err)
+		}
+		args = append(args, hashedPassword)
+		argIdx++
+	}
+
+	query += strings.Join(updates, ", ") + fmt.Sprintf(" WHERE manager_id = $%d", argIdx)
+	args = append(args, manager.ID)
+
+	_, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	return nil
+}
+
+// DeleteManager удаляет менеджера из БД.
+func (s *Storage) DeleteManager(managerID int) error {
+	const op = "storage.postgresql.DeleteManager"
+
+	stmt, err := s.db.Prepare(`DELETE FROM manager WHERE manager_id = $1`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	_, err = stmt.Exec(managerID)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	stmt, err = s.db.Prepare(`DELETE FROM user_session WHERE user_id = $1`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	_, err = stmt.Exec(managerID)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	return nil
+}
+
+// DeleteParking удаляет парковку из БД.
+func (s *Storage) DeleteParking(parkingID int) error {
+	const op = "storage.postgresql.DeleteParking"
+
+	stmt, err := s.db.Prepare(`
+	DELETE FROM parkings WHERE parking_id = $1
+	`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+	}
+
+	_, err = stmt.Exec(parkingID)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	return nil
+}
+
+// UpdateParking обновляет информацию о парковке в БД.
+func (s *Storage) UpdateParking(changes *parking.ParkingPatch, cellStruct []*models.ParkingCellStruct) (*models.Parking, error) {
+	const op = "storage.postgresql.UpdateParking"
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("%s: error while begining transaction: %w", op, err)
+	}
+
+	var updates []string
+	var args []interface{}
+	idx := 1
+
+	if changes.Name != nil {
+		updates = append(updates, fmt.Sprintf("parking_name = $%d", idx))
+		args = append(args, *changes.Name)
+		idx++
+	}
+	if changes.Address != nil {
+		updates = append(updates, fmt.Sprintf("parking_address = $%d", idx))
+		args = append(args, *changes.Address)
+		idx++
+	}
+	if changes.Manager != nil {
+		updates = append(updates, fmt.Sprintf("manager_id = $%d", idx))
+		args = append(args, changes.Manager.ID)
+		idx++
+	}
+	if changes.NightTariff != nil {
+		updates = append(updates, fmt.Sprintf("night_tariff = $%d", idx))
+		args = append(args, *changes.NightTariff)
+		idx++
+	}
+	if changes.DayTariff != nil {
+		updates = append(updates, fmt.Sprintf("day_tariff = $%d", idx))
+		args = append(args, *changes.DayTariff)
+		idx++
+	}
+	if changes.Width != nil {
+		updates = append(updates, fmt.Sprintf("parking_width = $%d", idx))
+		args = append(args, *changes.Width)
+		idx++
+	}
+	if changes.Height != nil {
+		updates = append(updates, fmt.Sprintf("parking_height = $%d", idx))
+		args = append(args, *changes.Height)
+		idx++
+	}
+
+	query := `UPDATE parkings SET ` + strings.Join(updates, ", ") + fmt.Sprintf(" WHERE parking_id = $%d", idx)
+	args = append(args, changes.ID)
+	fmt.Println(query, args)
+
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+
+	}
+
+	_, err = stmt.Exec(args...)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("%s: error while executing statement: %w", op, err)
+	}
+
+	if changes.Cells != nil {
+		err := s.updateParkingCells(changes, cellStruct)
+		if err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("%s: error while updating parking cells: %w", op, err)
+		}
+	}
+
+	parking, err := s.GetParkingByID(changes.ID, 0)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("%s: error while getting parking: %w", op, err)
+	}
+
+	err = tx.Commit()
+	return parking, err
+}
+
+func (s *Storage) updateParkingCells(changes *parking.ParkingPatch, cellStruct []*models.ParkingCellStruct) error {
+	const op = "storage.postgresql.updateParkingCells"
+
+	stmt, err := s.db.Prepare(`DELETE FROM parking_cell WHERE parking_id = $1`)
+	if err != nil {
+		return fmt.Errorf("%s: error while preparing \"delete parking cells\" statement: %w", op, err)
+	}
+
+	_, err = stmt.Exec(changes.ID)
+	if err != nil {
+		return fmt.Errorf("%s: error while executing \"delete parking cells\" statement: %w", op, err)
+	}
+
+	return nil
 }
