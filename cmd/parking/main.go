@@ -11,6 +11,7 @@ import (
 	"github.com/PIRSON21/parking/internal/ws"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"log"
 	"log/slog"
 	"net/http"
@@ -67,6 +68,7 @@ func main() {
 	router.Use(middleware.URLFormat)
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
+	router.Use(cors.AllowAll().Handler)
 
 	router.Group(func(public chi.Router) {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
