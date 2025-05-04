@@ -69,7 +69,7 @@ func main() {
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: []string{"localhost:3001", "*"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
