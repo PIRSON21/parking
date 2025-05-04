@@ -68,7 +68,19 @@ func main() {
 	router.Use(middleware.URLFormat)
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
-	router.Use(cors.AllowAll().Handler)
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{
+			http.MethodHead,
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+		},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	}))
 
 	router.Group(func(public chi.Router) {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
