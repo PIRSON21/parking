@@ -5,8 +5,8 @@ services:
     image: postgres:17-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    expose:
-      - ${DB_PORT}
+    ports:
+      - "5432:5432"
     healthcheck:
       test: [ "CMD-SHELL", "sh -c 'pg_isready -U parking -d parking'" ]
       interval: 10s
