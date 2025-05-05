@@ -84,17 +84,17 @@ func main() {
 
 	router.Group(func(public chi.Router) {
 		public.Post("/login", user.LoginHandler(log, db, cfg))
-
 	})
 
-	router.Group(func(user chi.Router) {
-		user.Use(authMiddleware.AuthMiddleware(db))
-		user.Route("/parking", func(r chi.Router) {
+	router.Group(func(usr chi.Router) {
+		usr.Use(authMiddleware.AuthMiddleware(db))
+		usr.Route("/parking", func(r chi.Router) {
 			r.Get("/", parking.AllParkingsHandler(log, db, cfg))
 			r.Get("/{id}", parking.GetParkingHandler(log, db, cfg))
 			r.Patch("/{id}", parking.UpdateParkingHandler(log, db, cfg))
 			r.Delete("/{id}", parking.DeleteParkingHandler(log, db, cfg))
 		})
+		usr.Get("/role", user.GetRoleHandler(log, cfg))
 	})
 
 	router.Group(func(manager chi.Router) {

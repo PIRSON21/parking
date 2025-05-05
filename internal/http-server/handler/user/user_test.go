@@ -7,6 +7,7 @@ import (
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user/mocks"
+	customMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	customErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
@@ -933,6 +934,98 @@ func TestUpdateManagerHandler(t *testing.T) {
 				assert.JSONEq(t, tc.ResponseBody, respBody)
 			} else {
 				assert.Equal(t, tc.ResponseBody, respBody)
+			}
+		})
+	}
+}
+
+func TestGetRoleHandler(t *testing.T) {
+	cases := []struct {
+		Name         string
+		Environment  string
+		UserID       any
+		JSON         bool
+		ResponseBody string
+		StatusCode   int
+	}{
+		{
+			Name:   "Success admin",
+			UserID: 0,
+			JSON:   true,
+			ResponseBody: test.MustMarshalResponse(map[string]interface{}{
+				"userID": 0,
+				"role":   "admin",
+			}),
+			StatusCode: http.StatusOK,
+		},
+		{
+			Name:   "Success manager",
+			UserID: 1,
+			JSON:   true,
+			ResponseBody: test.MustMarshalResponse(map[string]interface{}{
+				"userID": 1,
+				"role":   "manager",
+			}),
+			StatusCode: http.StatusOK,
+		},
+		{
+			Name:         "Wrong ID on prod",
+			UserID:       -1,
+			JSON:         false,
+			Environment:  test.EnvProd,
+			ResponseBody: test.InternalServerErrorMessage,
+			StatusCode:   http.StatusInternalServerError,
+		},
+		{
+			Name:         "ID isn't a number on prod",
+			UserID:       'a',
+			JSON:         false,
+			Environment:  test.EnvProd,
+			ResponseBody: test.InternalServerErrorMessage,
+			StatusCode:   http.StatusInternalServerError,
+		},
+		{
+			Name:         "Wrong ID on dev",
+			UserID:       -1,
+			JSON:         true,
+			ResponseBody: fmt.Sprintf(test.ExpectedError, "handler.user.GetRoleHandler: invalid userID: -1"),
+			StatusCode:   http.StatusInternalServerError,
+		},
+		{
+			Name:         "ID isn't a number on dev",
+			UserID:       'a',
+			JSON:         true,
+			ResponseBody: fmt.Sprintf(test.ExpectedError, "handler.user.GetRoleHandler: error with userID: 'a'"),
+			StatusCode:   http.StatusInternalServerError,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+
+			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/role", nil)
+			r = r.WithContext(context.WithValue(r.Context(), customMiddleware.UserIDKey, tc.UserID))
+
+			rr := httptest.NewRecorder()
+
+			log := slogdiscard.NewDiscardLogger()
+			cfg := &config.Config{}
+			if tc.Environment != "local" {
+				cfg.Environment = tc.Environment
+			}
+
+			user.GetRoleHandler(log, cfg).ServeHTTP(rr, r)
+			require.Equal(t, tc.StatusCode, rr.Code)
+
+			body := rr.Body.String()
+
+			if tc.JSON {
+				assert.JSONEq(t, tc.ResponseBody, body)
+				return
+			} else {
+				assert.Equal(t, tc.ResponseBody, body)
+				return
 			}
 		})
 	}

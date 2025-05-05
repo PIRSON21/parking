@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PIRSON21/parking/internal/config"
+	customMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	"github.com/PIRSON21/parking/internal/lib/api/request"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	customErr "github.com/PIRSON21/parking/internal/lib/errors"
@@ -362,5 +363,43 @@ func DeleteManagerHandler(log *slog.Logger, db UserSetter, cfg *config.Config) h
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// GetRoleHandler получает роль пользователя, если он авторизован.
+func GetRoleHandler(log *slog.Logger, cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "handler.user.GetRoleHandler"
+
+		log = log.With(
+			slog.String("op", op),
+			slog.String("reqID", middleware.GetReqID(r.Context())),
+		)
+
+		tmp := r.Context().Value(customMiddleware.UserIDKey)
+		userID, ok := tmp.(int)
+		if !ok {
+			log.Error("error while converting userID to int", slog.Any("usedID", tmp))
+			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error with userID: %q", op, tmp))
+			return
+		}
+
+		if userID == 0 {
+			render.JSON(w, r, map[string]interface{}{
+				"userID": 0,
+				"role":   "admin",
+			})
+			return
+		} else if userID > 0 {
+			render.JSON(w, r, map[string]interface{}{
+				"userID": userID,
+				"role":   "manager",
+			})
+			return
+		} else {
+			log.Error("invalid userID", slog.Int("userID", userID))
+			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: invalid userID: %d", op, userID))
+			return
+		}
 	}
 }
