@@ -109,11 +109,13 @@ func (ss *Session) tryToPark(carID string) {
 
 	if canEnter := ss.evaluateEntrance(); !canEnter {
 		ss.droveAwayCar(carID)
+		return
 	}
 
 	spot, ok := ss.parking.OccupySpot()
 	if !ok {
 		ss.droveAwayCar(carID)
+		return
 	}
 
 	ss.mu.Lock()
