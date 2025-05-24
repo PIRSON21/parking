@@ -91,6 +91,7 @@ func (ss *Session) sendCarEvent() {
 // tryToPark определяет, заедет машина на парковку или нет.
 func (ss *Session) tryToPark(carID string) {
 	err := ss.sem.Acquire(ss.ctx, 1)
+	defer ss.sem.Release(1)
 	if err != nil {
 		return
 	}
@@ -155,6 +156,12 @@ func (ss *Session) sendParkEvent(carID string) {
 
 // droveAwayCar создает событие, когда автомобиль не заезжает на парковку.
 func (ss *Session) droveAwayCar(carID string) {
+	err := ss.sem.Acquire(ss.ctx, 1)
+	if err != nil {
+		return
+	}
+	defer ss.sem.Release(1)
+
 	event := CarEvent{
 		Event:     "drove-away",
 		CarID:     carID,
@@ -167,8 +174,6 @@ func (ss *Session) droveAwayCar(carID string) {
 	if err != nil {
 		return
 	}
-
-	ss.sem.Release(1)
 
 	ss.client.Send(data)
 }
@@ -227,8 +232,6 @@ func (ss *Session) sendLeaveParkEvent(carID string) {
 	if err != nil {
 		return
 	}
-
-	ss.sem.Release(1)
 
 	ss.client.Send(data)
 }
