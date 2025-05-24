@@ -3,6 +3,12 @@ package main
 import (
 	"errors"
 	"flag"
+	"log"
+	"log/slog"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user"
@@ -12,11 +18,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"log"
-	"log/slog"
-	"net/http"
-	"os"
-	"time"
 )
 
 const (

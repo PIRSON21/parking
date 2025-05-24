@@ -2,10 +2,11 @@ package simulation
 
 import (
 	"encoding/json"
+	"log"
+
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/google/uuid"
 	customTimer "github.com/ivahaev/timer"
-	"log"
 )
 
 // CarEvent - тело события машины (прибытие, парковка, отъезд)
@@ -13,10 +14,10 @@ type CarEvent struct {
 	Event     string `json:"event"`             // "arrive", "drove-away", "leave"
 	CarID     string `json:"car_id"`            // id машины
 	TimeStamp int64  `json:"timestamp"`         // время события
-	ParkID    *int   `json:"park_id,omitempty"` // id парковочного места
-	ParkX     *int   `json:"park_x,omitempty"`  // х координата парковочного места
-	ParkY     *int   `json:"park_y,omitempty"`  // y координата парковочного места
-	Price     *int   `json:"price,omitempty"`   // стоимость парковки
+	ParkID    int    `json:"park_id,omitempty"` // id парковочного места
+	ParkX     int    `json:"park_x,omitempty"`  // х координата парковочного места
+	ParkY     int    `json:"park_y,omitempty"`  // y координата парковочного места
+	Price     int    `json:"price,omitempty"`   // стоимость парковки
 }
 
 const (
@@ -136,9 +137,9 @@ func (ss *Session) sendParkEvent(carID string) {
 	event := CarEvent{
 		Event:     "park",
 		CarID:     carID,
-		ParkID:    &car.Spot.ID,
-		ParkX:     &car.Spot.X,
-		ParkY:     &car.Spot.Y,
+		ParkID:    car.Spot.ID,
+		ParkX:     car.Spot.X,
+		ParkY:     car.Spot.Y,
 		TimeStamp: ss.timer.elapsedTime.Unix(),
 	}
 
@@ -206,7 +207,6 @@ func (ss *Session) scheduleLeave(carID string, spot *models.ParkingSpot) {
 
 // sendLeaveParkEvent отправляет событие о выезде автомобиля с парковки.
 func (ss *Session) sendLeaveParkEvent(carID string) {
-
 	ss.mu.Lock()
 	car := ss.car[carID]
 	ss.mu.Unlock()
@@ -214,11 +214,11 @@ func (ss *Session) sendLeaveParkEvent(carID string) {
 	event := CarEvent{
 		Event:     "leave",
 		CarID:     carID,
-		ParkID:    &car.Spot.ID,
-		ParkX:     &car.Spot.X,
-		ParkY:     &car.Spot.Y,
+		ParkID:    car.Spot.ID,
+		ParkX:     car.Spot.X,
+		ParkY:     car.Spot.Y,
 		TimeStamp: ss.timer.elapsedTime.Unix(),
-		Price:     &car.Price,
+		Price:     car.Price,
 	}
 
 	delete(ss.car, carID)

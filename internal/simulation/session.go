@@ -2,11 +2,12 @@ package simulation
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"golang.org/x/sync/semaphore"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/PIRSON21/parking/internal/models"
 )
@@ -165,7 +166,7 @@ func (ss *Session) CheckPark(msg string) {
 		args := strings.Split(msg, "park ")
 		for _, carID := range args {
 			if err := uuid.Validate(carID); err == nil {
-				ss.sendParkEvent(carID)
+				ss.tryToPark(carID)
 			}
 		}
 	}
