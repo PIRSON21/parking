@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
+	"time"
+
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user"
@@ -13,9 +17,6 @@ import (
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
-	"log"
-	"strings"
-	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -48,8 +49,8 @@ func MustConnectDB(cfg *config.Config) *Storage {
 // GetAdminParkings получает из БД данные о всех парковках по запросу search.
 func (s *Storage) GetAdminParkings(search string) ([]*models.Parking, error) {
 	query := `
-			SELECT 
-			    parking_id, parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology 
+			SELECT
+			    parking_id, parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology
 			FROM parkings
 			WHERE parking_name ILIKE $1
     `
@@ -60,7 +61,7 @@ func (s *Storage) GetAdminParkings(search string) ([]*models.Parking, error) {
 // GetManagerParkings получает из БД данные о всех доступных менеджеру парковках по запросу search.
 func (s *Storage) GetManagerParkings(userID int, search string) ([]*models.Parking, error) {
 	query := `
-			SELECT 
+			SELECT
 			    parking_id, parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology
 			FROM parkings
 			WHERE parking_name ILIKE $1 AND manager_id = $2
@@ -149,8 +150,8 @@ func (s *Storage) GetParkingByID(parkingID int, userID int) (*models.Parking, er
 	const op = "storage.postgresql.GetParkingById"
 
 	stmt, err := s.db.Prepare(`
-	SELECT 
-	    parking_id, parking_name, parking_address, parking_width, parking_height, manager_id, day_tariff, night_tariff, parking_topology 
+	SELECT
+	    parking_id, parking_name, parking_address, parking_width, parking_height, manager_id, day_tariff, night_tariff, parking_topology
 	FROM parkings
 	WHERE parking_id = $1;
 	`)
@@ -204,7 +205,7 @@ func (s *Storage) GetParkingCells(parking *models.Parking) error {
 	}
 
 	stmt, err := s.db.Prepare(`
-		SELECT 
+		SELECT
 			x,y, cell_type
 		FROM parking_cell
 		WHERE parking_id = $1;
@@ -252,7 +253,6 @@ func (s *Storage) GetParkingCells(parking *models.Parking) error {
 
 	parking.Cells = parkingCells
 	return nil
-
 }
 
 // GetUserID получает и проверяет актуальность сессии, и возвращает id пользователя.
@@ -262,8 +262,8 @@ func (s *Storage) GetUserID(sessionID string) (int, error) {
 	const op = "storage.postgresql.GetUserID"
 
 	stmt, err := s.db.Prepare(`
-	SELECT user_id, deadline 
-	FROM user_session 
+	SELECT user_id, deadline
+	FROM user_session
 	WHERE session_id = $1 AND deadline > now();
 	`)
 	if err != nil {
@@ -298,7 +298,6 @@ func (s *Storage) AuthenticateManager(user *models.User) (int, error) {
 
 	stmt, err := s.db.Prepare(`SELECT manager_id, manager_password FROM manager WHERE manager_login = $1;`)
 	if err != nil {
-
 		return 0, fmt.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 

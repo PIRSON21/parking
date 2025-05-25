@@ -52,10 +52,6 @@ func generateDiscreteDelay(discrete float64) time.Duration {
 }
 
 func (ss *Session) evaluateEntrance() bool {
-	if !ss.parking.HasFreeSpot() {
-		return false
-	}
-
 	return rand.Float64() < ss.arrivalCfg.ParkingProb
 }
 
@@ -75,7 +71,7 @@ func (ss *Session) generateLeaveDelay() time.Duration {
 }
 
 // calculateParkingCost вычисляет стоимость стоянки.
-func (ss *Session) calculateParkingCost(now time.Time, entered time.Time) int {
+func (ss *Session) calculateParkingCost(now time.Time, entered time.Time) float64 {
 	totalCost := 0.0
 
 	for entered.Before(now) {
@@ -94,7 +90,7 @@ func (ss *Session) calculateParkingCost(now time.Time, entered time.Time) int {
 		entered = nextBoundary
 	}
 
-	return int(totalCost)
+	return totalCost
 }
 
 // getNextBoundary определяет следующую границу тарифа.

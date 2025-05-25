@@ -2,13 +2,14 @@ package response
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 type Response struct {
@@ -62,8 +63,8 @@ func NewParkingResponse(p *models.Parking) *ParkingResponse {
 		ID:          p.ID,
 		Name:        p.Name,
 		Address:     p.Address,
-		DayTariff:   p.DayTariff,
-		NightTariff: p.NightTariff,
+		DayTariff:   *p.DayTariff,
+		NightTariff: *p.NightTariff,
 		Cells:       append([][]models.ParkingCell{}, p.Cells...),
 		URL:         fmt.Sprintf("/parking/%d", p.ID),
 	}
