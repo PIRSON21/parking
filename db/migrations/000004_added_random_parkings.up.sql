@@ -10,3 +10,5 @@ VALUES
     (8, '1:Отель', 'ул. Горького, 12', 4, 6),
     (9, '1:Отель', 'ул. Горького, 15', 6, 5),
     (10, '1:БЦ', 'ул. Мира, 8', 5, 5);
+
+SELECT setval('parkings_parking_id_seq', COALESCE((SELECT MAX(parking_id) FROM parkings), 1), false);

@@ -121,8 +121,8 @@ func (s *Storage) AddParking(parking *models.Parking) error {
 	tx, err := s.db.Begin()
 
 	stmt, err := s.db.Prepare(`
-		INSERT INTO parkings (parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO parkings (parking_name, parking_address, parking_width, parking_height, day_tariff, night_tariff, parking_topology, manager_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING parking_id;
 	`)
 	if err != nil {
@@ -135,7 +135,13 @@ func (s *Storage) AddParking(parking *models.Parking) error {
 		topology = []byte("[]")
 	}
 
-	err = stmt.QueryRow(&parking.Name, &parking.Address, &parking.Width, &parking.Height, &parking.DayTariff, &parking.NightTariff, &topology).Scan(&parking.ID)
+	var managerID sql.NullInt64
+	if parking.Manager != nil {
+		managerID.Int64 = int64(parking.Manager.ID)
+		managerID.Valid = true
+	}
+
+	err = stmt.QueryRow(&parking.Name, &parking.Address, &parking.Width, &parking.Height, &parking.DayTariff, &parking.NightTariff, &topology, &managerID).Scan(&parking.ID)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("%s: error while executing statement: %w", op, err)
@@ -589,10 +595,21 @@ func (s *Storage) UpdateParking(changes *parking.ParkingPatch, cellStruct []*mod
 		args = append(args, *changes.Height)
 		idx++
 	}
+	if changes.Cells != nil {
+		topology, err := json.Marshal(&changes.Cells)
+		if err != nil {
+			topology = []byte{}
+		}
+
+		if topology != nil {
+			updates = append(updates, fmt.Sprintf("parking_topology = $%d", idx))
+			args = append(args, topology)
+			idx++
+		}
+	}
 
 	query := `UPDATE parkings SET ` + strings.Join(updates, ", ") + fmt.Sprintf(" WHERE parking_id = $%d", idx)
 	args = append(args, changes.ID)
-	fmt.Println(query, args)
 
 	stmt, err := s.db.Prepare(query)
 	if err != nil {

@@ -3,6 +3,10 @@ package parking
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"strconv"
+
 	"github.com/PIRSON21/parking/internal/config"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
 	customValidator "github.com/PIRSON21/parking/internal/lib/validator"
@@ -11,14 +15,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
-	"log/slog"
-	"net/http"
-	"strconv"
 )
 
-var (
-	invalidParkingIndex = errors.New("invalid parkingID syntax")
-)
+var invalidParkingIndex = errors.New("invalid parkingID syntax")
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=ParkingSetter
 type ParkingSetter interface {
@@ -91,16 +90,16 @@ func AddParkingHandler(log *slog.Logger, storage ParkingSetter, cfg *config.Conf
 // Возвращает список всех найденных ошибок
 func validateParkingCells(parking *models.Parking) []error {
 	var errors []error
-	if len(parking.Cells) != parking.Width {
+	if len(parking.Cells) != parking.Height {
 		errors = append(errors, fmt.Errorf("длина парковки не соответствует длине топологии: %d", parking.Height))
 	}
 
-	for i, height := range parking.Cells {
-		if len(height) != parking.Height {
+	for i, width := range parking.Cells {
+		if len(width) != parking.Width {
 			errors = append(errors, fmt.Errorf("ширина строки %d не соответствует ширине топологии: %d", i, parking.Width))
 		}
 
-		for j, cell := range height {
+		for j, cell := range width {
 			if !cell.IsParkingCell() {
 				errors = append(errors, fmt.Errorf("клетка (%d,%d) недействительна: '%s'", j, i, cell))
 			}
@@ -220,6 +219,5 @@ func UpdateParkingHandler(log *slog.Logger, db ParkingSetter, cfg *config.Config
 		}
 
 		render.JSON(w, r, parking)
-
 	}
 }
