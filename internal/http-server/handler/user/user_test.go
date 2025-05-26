@@ -105,7 +105,7 @@ func TestLoginHandler(t *testing.T) {
 			SetSessionIDError:        nil,
 			ResponseCode:             http.StatusBadRequest,
 			JSON:                     true,
-			ResponseBody:             fmt.Sprintf(test.ExpectedValidationError, "login", fmt.Sprintf(test.Max, 8)),
+			ResponseBody:             fmt.Sprintf(test.ExpectedValidationError, "login", fmt.Sprintf(test.Max, 15)),
 		},
 		{
 			Name: "Password smaller min",
@@ -131,7 +131,7 @@ func TestLoginHandler(t *testing.T) {
 			SetSessionIDError:        nil,
 			ResponseCode:             http.StatusBadRequest,
 			JSON:                     true,
-			ResponseBody:             fmt.Sprintf(test.ExpectedValidationError, "password", fmt.Sprintf(test.Max, 10)),
+			ResponseBody:             fmt.Sprintf(test.ExpectedValidationError, "password", fmt.Sprintf(test.Max, 20)),
 		},
 		{
 			Name: "Validation errors",
@@ -605,10 +605,11 @@ func TestGetManagerByIDHandler(t *testing.T) {
 			}),
 		},
 		{
-			Name:         "No such manager",
-			ManagerID:    5,
-			StatusCode:   http.StatusNotFound,
-			ResponseBody: test.NotFound,
+			Name:             "No such manager",
+			ManagerID:        5,
+			StatusCode:       http.StatusNotFound,
+			ManagerByIDError: customErr.ErrManagerNotFound,
+			ResponseBody:     test.NotFound,
 		},
 		{
 			Name:         "Wrong id",

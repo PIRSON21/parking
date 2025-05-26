@@ -73,7 +73,7 @@ type ParkingCellStruct struct {
 // User отражает поля пользователей
 type User struct {
 	ID       int
-	Login    string `json:"login" validate:"required,min=4,max=8"`
+	Login    string `json:"login" validate:"required,min=4,max=20"`
 	Password string `json:"password" validate:"required,min=4,max=10"`
 	Email    string `json:"email,omitempty" validate:"omitempty,email,min=8,max=15"`
 }
