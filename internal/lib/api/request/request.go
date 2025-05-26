@@ -2,7 +2,7 @@ package request
 
 // UserLogin используется для валидации пользователя при авторизации менеджера
 type UserLogin struct {
-	Login    string `json:"login" validate:"required,min=4,max=8"`
+	Email    string `json:"login" validate:"required,min=4,max=15"`
 	Password string `json:"password" validate:"required,min=4,max=10"`
 }
 

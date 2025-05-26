@@ -2,6 +2,7 @@ package models
 
 import (
 	"container/heap"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -74,6 +75,7 @@ func (p *ParkingLot) OccupySpot() (*ParkingPoint, bool) {
 	minDistance := math.MaxFloat64
 
 	nearestSpot = p.findNearestSpot(minDistance)
+	fmt.Printf("nearestSpot: %v\n", nearestSpot)
 
 	if nearestSpot != nil {
 		nearestSpot.isFree = false
@@ -99,10 +101,12 @@ func (p *ParkingLot) findNearestSpot(minDistance float64) *ParkingPoint {
 	dist := make([][]float64, height)
 	for i := range dist {
 		dist[i] = make([]float64, width)
-		for j := range dist {
+		for j := range dist[i] {
 			dist[i][j] = math.Inf(1)
 		}
 	}
+
+	fmt.Println(dist)
 
 	// Матрица для отслеживания посещенных ячеек
 	visited := make([][]bool, height)
@@ -166,6 +170,8 @@ func (p *ParkingLot) findNearestSpot(minDistance float64) *ParkingPoint {
 			}
 		}
 	}
+
+	fmt.Println(dist)
 
 	// Если нашли лучшее парковочное место, возвращаем его
 	if bestParkingSpot != nil {

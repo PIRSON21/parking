@@ -3,6 +3,11 @@ package user
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/PIRSON21/parking/internal/config"
 	customMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	"github.com/PIRSON21/parking/internal/lib/api/request"
@@ -15,15 +20,9 @@ import (
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"log/slog"
-	"net/http"
-	"strconv"
-	"time"
 )
 
-var (
-	InvalidManagerIndex = errors.New("invalid managerID index")
-)
+var InvalidManagerIndex = errors.New("invalid managerID index")
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=UserGetter
 type UserGetter interface {
@@ -67,7 +66,7 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 
 		// проверка на администратора. По условиям задачи, администратор должен иметь один единственный аккаунт,
 		// которые встроен в коде программы. Я ЗНАЮ, ЧТО ТАК НЕ НАДО. так просили
-		if userReq.Login == "admin" && userReq.Password == "admin" {
+		if userReq.Email == "admin" && userReq.Password == "admin" {
 			err = returnSessionID(w, 0, db)
 			if err != nil {
 				log.Error("err while returning session ID", slog.String("err", err.Error()))
@@ -80,7 +79,7 @@ func LoginHandler(log *slog.Logger, db UserGetter, cfg *config.Config) http.Hand
 		}
 
 		user := &models.User{
-			Login:    userReq.Login,
+			Email:    userReq.Email,
 			Password: userReq.Password,
 		}
 

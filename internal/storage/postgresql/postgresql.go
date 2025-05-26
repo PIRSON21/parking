@@ -296,12 +296,12 @@ func (s *Storage) AuthenticateManager(user *models.User) (int, error) {
 	var hashedPassword string
 	var managerID int
 
-	stmt, err := s.db.Prepare(`SELECT manager_id, manager_password FROM manager WHERE manager_login = $1;`)
+	stmt, err := s.db.Prepare(`SELECT manager_id, manager_password FROM manager WHERE manager_email = $1;`)
 	if err != nil {
 		return 0, fmt.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
-	err = stmt.QueryRow(user.Login).Scan(&managerID, &hashedPassword)
+	err = stmt.QueryRow(user.Email).Scan(&managerID, &hashedPassword)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, custErr.ErrUnauthorized
