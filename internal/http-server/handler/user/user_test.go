@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"testing"
+
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user"
 	"github.com/PIRSON21/parking/internal/http-server/handler/user/mocks"
@@ -18,10 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"net/http/httptest"
-	"strconv"
-	"testing"
+	"golang.org/x/xerrors"
 )
 
 const (
@@ -154,7 +156,7 @@ func TestLoginHandler(t *testing.T) {
 				Password: "aboba",
 			}),
 			ManagerID:                0,
-			AuthenticateManagerError: fmt.Errorf("test authenticateManager error"),
+			AuthenticateManagerError: xerrors.Errorf("test authenticateManager error"),
 			SetSessionIDError:        nil,
 			Environment:              test.EnvLocal,
 			ResponseCode:             http.StatusInternalServerError,
@@ -168,7 +170,7 @@ func TestLoginHandler(t *testing.T) {
 				Password: "aboba",
 			}),
 			ManagerID:                0,
-			AuthenticateManagerError: fmt.Errorf("test authenticateManager error"),
+			AuthenticateManagerError: xerrors.Errorf("test authenticateManager error"),
 			SetSessionIDError:        nil,
 			Environment:              test.EnvProd,
 			ResponseCode:             http.StatusInternalServerError,
@@ -183,7 +185,7 @@ func TestLoginHandler(t *testing.T) {
 			}),
 			ManagerID:                0,
 			AuthenticateManagerError: nil,
-			SetSessionIDError:        fmt.Errorf("test SetSessionID error"),
+			SetSessionIDError:        xerrors.Errorf("test SetSessionID error"),
 			Environment:              test.EnvLocal,
 			ResponseCode:             http.StatusInternalServerError,
 			JSON:                     true,
@@ -197,7 +199,7 @@ func TestLoginHandler(t *testing.T) {
 			}),
 			ManagerID:                0,
 			AuthenticateManagerError: nil,
-			SetSessionIDError:        fmt.Errorf("test SetSessionID error"),
+			SetSessionIDError:        xerrors.Errorf("test SetSessionID error"),
 			Environment:              test.EnvProd,
 			ResponseCode:             http.StatusInternalServerError,
 			JSON:                     false,
@@ -418,7 +420,7 @@ func TestCreateManagerHandler(t *testing.T) {
 		},
 		{
 			Name:                  "Error when creating manager on dev",
-			CreateNewManagerError: fmt.Errorf("test error"),
+			CreateNewManagerError: xerrors.Errorf("test error"),
 			RequestBody: test.MustMarshal(&models.User{
 				Login:    "aboba",
 				Password: "aboba",
@@ -431,7 +433,7 @@ func TestCreateManagerHandler(t *testing.T) {
 		},
 		{
 			Name:                  "Error when creating manager on prod",
-			CreateNewManagerError: fmt.Errorf("test error"),
+			CreateNewManagerError: xerrors.Errorf("test error"),
 			RequestBody: test.MustMarshal(&models.User{
 				Login:    "aboba",
 				Password: "aboba",
@@ -517,7 +519,7 @@ func TestDeleteManagerHandler(t *testing.T) {
 		{
 			Name:               "DB error on prod",
 			ManagerID:          5,
-			DeleteManagerError: fmt.Errorf("aboba"),
+			DeleteManagerError: xerrors.Errorf("aboba"),
 			Environment:        "prod",
 			StatusCode:         http.StatusInternalServerError,
 			JSON:               false,
@@ -526,7 +528,7 @@ func TestDeleteManagerHandler(t *testing.T) {
 		{
 			Name:               "DB error on dev",
 			ManagerID:          5,
-			DeleteManagerError: fmt.Errorf("aboba"),
+			DeleteManagerError: xerrors.Errorf("aboba"),
 			StatusCode:         http.StatusInternalServerError,
 			JSON:               true,
 			ResponseBody:       fmt.Sprintf(test.ExpectedError, "aboba"),
@@ -619,7 +621,7 @@ func TestGetManagerByIDHandler(t *testing.T) {
 		{
 			Name:             "DB error on prod",
 			ManagerID:        2,
-			ManagerByIDError: fmt.Errorf("aboba"),
+			ManagerByIDError: xerrors.Errorf("aboba"),
 			Environment:      "prod",
 			StatusCode:       http.StatusInternalServerError,
 			JSON:             false,
@@ -628,7 +630,7 @@ func TestGetManagerByIDHandler(t *testing.T) {
 		{
 			Name:             "DB error on dev",
 			ManagerID:        2,
-			ManagerByIDError: fmt.Errorf("aboba"),
+			ManagerByIDError: xerrors.Errorf("aboba"),
 			StatusCode:       http.StatusInternalServerError,
 			JSON:             true,
 			ResponseBody:     fmt.Sprintf(test.ExpectedError, "aboba"),
@@ -750,7 +752,7 @@ func TestGetManagersHandler(t *testing.T) {
 		{
 			Name:             "DB error on prod",
 			Managers:         nil,
-			GetManagersError: fmt.Errorf("aboba"),
+			GetManagersError: xerrors.Errorf("aboba"),
 			Environment:      "prod",
 			StatusCode:       http.StatusInternalServerError,
 			JSON:             false,
@@ -759,7 +761,7 @@ func TestGetManagersHandler(t *testing.T) {
 		{
 			Name:             "DB error on dev",
 			Managers:         nil,
-			GetManagersError: fmt.Errorf("aboba"),
+			GetManagersError: xerrors.Errorf("aboba"),
 			StatusCode:       http.StatusInternalServerError,
 			JSON:             true,
 			ResponseBody:     fmt.Sprintf(test.ExpectedError, "aboba"),
@@ -801,7 +803,6 @@ func TestGetManagersHandler(t *testing.T) {
 }
 
 func TestUpdateManagerHandler(t *testing.T) {
-
 	cases := []struct {
 		Name               string
 		ManagerID          int
@@ -867,7 +868,7 @@ func TestUpdateManagerHandler(t *testing.T) {
 				"email":    "aboba2@ab.com",
 				"password": "aboba2",
 			}),
-			UpdateManagerError: fmt.Errorf("aboba"),
+			UpdateManagerError: xerrors.Errorf("aboba"),
 			StatusCode:         http.StatusInternalServerError,
 			JSON:               true,
 			ResponseBody:       fmt.Sprintf(test.ExpectedError, "aboba"),
@@ -886,7 +887,7 @@ func TestUpdateManagerHandler(t *testing.T) {
 				"email":    "aboba2@ab.com",
 				"password": "aboba2",
 			}),
-			UpdateManagerError: fmt.Errorf("aboba"),
+			UpdateManagerError: xerrors.Errorf("aboba"),
 			Environment:        "prod",
 			StatusCode:         http.StatusInternalServerError,
 			JSON:               false,

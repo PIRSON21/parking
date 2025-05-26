@@ -1,16 +1,18 @@
 package middleware_test
 
 import (
-	"fmt"
-	"github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
-	"github.com/PIRSON21/parking/internal/lib/api/auth/middleware/mocks"
-	custErr "github.com/PIRSON21/parking/internal/lib/errors"
-	"github.com/PIRSON21/parking/internal/lib/test"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
+	"github.com/PIRSON21/parking/internal/lib/api/auth/middleware/mocks"
+	custErr "github.com/PIRSON21/parking/internal/lib/errors"
+	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
+	"github.com/PIRSON21/parking/internal/lib/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/xerrors"
 )
 
 const (
@@ -101,7 +103,7 @@ func TestAuthMiddleware(t *testing.T) {
 			Name:           "Internal error",
 			SessionID:      "aboba",
 			UserID:         0,
-			GetUserIDError: fmt.Errorf("test middleware error"),
+			GetUserIDError: xerrors.Errorf("test middleware error"),
 			Cookie: &http.Cookie{
 				Name:  "session_id",
 				Value: "aboba",
@@ -113,7 +115,6 @@ func TestAuthMiddleware(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-
 			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				userID := r.Context().Value(middleware.UserIDKey)
 				require.NotEqual(t, userID, nil)
@@ -134,9 +135,11 @@ func TestAuthMiddleware(t *testing.T) {
 				req.AddCookie(tc.Cookie)
 			}
 
+			log := slogdiscard.NewDiscardLogger()
+
 			rr := httptest.NewRecorder()
 
-			middleware.AuthMiddleware(authGetterMock)(nextHandler).ServeHTTP(rr, req)
+			middleware.AuthMiddleware(log, authGetterMock)(nextHandler).ServeHTTP(rr, req)
 
 			require.Equal(t, tc.ResponseCode, rr.Code)
 

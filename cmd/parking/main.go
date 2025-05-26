@@ -59,6 +59,7 @@ func main() {
 	log.Info("logger started successfully", slog.String("env", cfg.Environment))
 	// подключение БД
 	db := postgresql.MustConnectDB(cfg)
+	log.Info("DB connected successfully", slog.String("host", cfg.DBHost), slog.String("name", cfg.DBName))
 
 	// установка роутера chi
 	router := chi.NewRouter()
@@ -70,7 +71,7 @@ func main() {
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(middleware.RedirectSlashes)
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://localhost:3001"},
+		AllowedOrigins: []string{"http://localhost:3001", "http://localhost:3000"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
@@ -88,26 +89,26 @@ func main() {
 	})
 
 	router.Group(func(usr chi.Router) {
-		usr.Use(authMiddleware.AuthMiddleware(db))
+		usr.Use(authMiddleware.AuthMiddleware(log, db))
 		usr.Route("/parking", func(r chi.Router) {
 			r.Get("/", parking.AllParkingsHandler(log, db, cfg))
 			r.Get("/{id}", parking.GetParkingHandler(log, db, cfg))
-			r.Patch("/{id}", parking.UpdateParkingHandler(log, db, cfg))
-			r.Delete("/{id}", parking.DeleteParkingHandler(log, db, cfg))
 		})
 		usr.Get("/role", user.GetRoleHandler(log, cfg))
 	})
 
 	router.Group(func(manager chi.Router) {
-		manager.Use(authMiddleware.AuthMiddleware(db))
+		manager.Use(authMiddleware.AuthMiddleware(log, db))
 		manager.Use(authMiddleware.ManagerMiddleware)
 		manager.Get("/ws/simulate", ws.WebSocketHandler(log, cfg))
 	})
 
 	router.Group(func(admin chi.Router) {
-		admin.Use(authMiddleware.AuthMiddleware(db))
+		admin.Use(authMiddleware.AuthMiddleware(log, db))
 		admin.Use(authMiddleware.AdminMiddleware)
 		admin.Post("/parking", parking.AddParkingHandler(log, db, cfg))
+		admin.Patch("/parking/{id}", parking.UpdateParkingHandler(log, db, cfg))
+		admin.Delete("/parking/{id}", parking.DeleteParkingHandler(log, db, cfg))
 		admin.Route("/manager", func(mng chi.Router) {
 			mng.Post("/", user.CreateManagerHandler(log, db, cfg))
 			mng.Get("/", user.GetManagersHandler(log, db, cfg))

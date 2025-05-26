@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"testing"
+
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking/mocks"
@@ -15,15 +20,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"net/http/httptest"
-	"strconv"
-	"testing"
+	"golang.org/x/xerrors"
 )
 
 const (
-	cellsWidthWrong  = `"длина строки %d не соответствует длине топологии: %d"`
-	cellsHeightWrong = `"ширина парковки не соответствует ширине топологии: %d"`
+	cellsWidthWrong  = `"ширина строки %d не соответствует ширине топологии: %d"`
+	cellsHeightWrong = `"длина парковки не соответствует длине топологии: %d"`
 	cellsWrongCell   = `"клетка (%d,%d) недействительна: '%s'"`
 
 	urlAddParking = "/parking/add"
@@ -65,8 +67,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -82,14 +84,14 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Cells: [][]models.ParkingCell{
-					{".", ".", ".", ".", "I"},
+					{".", ".", ".", ".", "."},
 					{".", "P", "P", "P", "."},
 					{".", "D", "D", ".", "."},
 					{".", ".", ".", ".", "."},
-					{"O", ".", ".", "P", "P"},
+					{".", "I", "O", "P", "P"},
 				},
 			}),
 			AddParkingError:         nil,
@@ -104,8 +106,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -119,8 +121,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Width:       5,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -134,8 +136,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -149,8 +151,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -164,8 +166,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "a",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -180,8 +182,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -196,8 +198,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "a",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -213,8 +215,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкинаaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Width:       5,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -229,8 +231,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       1,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -245,8 +247,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       10,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -261,8 +263,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
 				Height:      1,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
 			AddParkingError:         nil,
 			AddCellsForParkingError: nil,
@@ -276,8 +278,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      10,
 			}),
 			AddParkingError:         nil,
@@ -292,15 +294,15 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      5,
 				Cells: [][]models.ParkingCell{
-					{".", ".", ".", ".", "I", "."},
+					{".", ".", ".", ".", ".", "."},
 					{".", "P", "P", "P", "."},
 					{".", "D", "D", ".", "."},
 					{".", ".", ".", ".", "."},
-					{"O", ".", ".", "P", "P"},
+					{"O", "I", ".", "P", "P"},
 				},
 			}),
 			AddParkingError:         nil,
@@ -316,16 +318,16 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      5,
 				Cells: [][]models.ParkingCell{
-					{".", ".", ".", ".", "I"},
+					{".", ".", ".", ".", "."},
 					{".", "P", "P", "P", "."},
 					{".", "D", "D", ".", "."},
 					{".", ".", ".", ".", "."},
-					{"O", ".", ".", "P", "P"},
-					{"O", ".", ".", "P", "P"},
+					{".", ".", ".", "P", "P"},
+					{".", "I", "O", "P", "P"},
 				},
 			}),
 			AddParkingError:         nil,
@@ -341,15 +343,15 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 				Height:      5,
 				Cells: [][]models.ParkingCell{
-					{".", ".", ".", ".", "I"},
+					{".", ".", ".", ".", "."},
 					{".", "P", "P", "P", "."},
 					{".", "D", "D", ".", "H"},
 					{".", ".", ".", ".", "."},
-					{"O", ".", ".", "P", "P"},
+					{"O", "I", ".", "P", "P"},
 				},
 			}),
 			AddParkingError:         nil,
@@ -366,10 +368,10 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
-			AddParkingError:         fmt.Errorf("test parking error"),
+			AddParkingError:         xerrors.Errorf("test parking error"),
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusInternalServerError,
 			ExpectedResponse:        fmt.Sprintf(test.ExpectedError, "http-server.handler.parking.AddParkingHandler: error while saving Parking: test parking error"),
@@ -383,10 +385,10 @@ func TestAddParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
 				Height:      5,
-				DayTariff:   5,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1),
 			}),
-			AddParkingError:         fmt.Errorf("test parking error"),
+			AddParkingError:         xerrors.Errorf("test parking error"),
 			AddCellsForParkingError: nil,
 			ResponseCode:            http.StatusInternalServerError,
 			ExpectedResponse:        test.InternalServerErrorMessage,
@@ -399,8 +401,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   1001,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(1001),
+				NightTariff: test.NewInt(5),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -415,8 +417,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   -1,
-				NightTariff: 1,
+				DayTariff:   test.NewInt(-1),
+				NightTariff: test.NewInt(5),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -431,8 +433,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   5,
-				NightTariff: 1001,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(1001),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -447,8 +449,8 @@ func TestAddParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       5,
-				DayTariff:   1,
-				NightTariff: -1,
+				DayTariff:   test.NewInt(5),
+				NightTariff: test.NewInt(-1),
 				Height:      5,
 			}),
 			AddParkingError:         nil,
@@ -461,7 +463,6 @@ func TestAddParkingHandler(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-
 			parkingSetterMock := mocks.NewParkingSetter(t)
 			parkingSetterMock.On("AddParking", mock.AnythingOfType("*models.Parking")).
 				Return(tc.AddParkingError).
@@ -505,7 +506,6 @@ func TestAddParkingHandler(t *testing.T) {
 			assert.Fail(t, "не все проверки прописаны")
 		})
 	}
-
 }
 
 func TestDeleteParkingHandler(t *testing.T) {

@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/ilyakaznacheev/cleanenv"
 	"log"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
@@ -22,6 +23,7 @@ type ConfigDB struct {
 // передан в path. Если возникла ошибка, приложение падает.
 func MustCreateConfig(path string) *Config {
 	var cfg Config
+	log.Println("reading config from file: ", path)
 	err := cleanenv.ReadConfig(path, &cfg)
 	if err != nil {
 		log.Fatal(err)

@@ -50,6 +50,7 @@ func (ss *Session) scheduleCar() {
 				return
 			}
 		case <-ss.ctx.Done():
+			ss.log.Debug("session stopped, stop scheduling cars")
 			return
 		}
 	}
@@ -85,6 +86,7 @@ func (ss *Session) sendCarEvent() {
 		return
 	}
 
+	ss.log.Debug("car arrived", "car_id", carID, "time", ss.timer.elapsedTime)
 	ss.client.Send(data)
 }
 
@@ -95,10 +97,13 @@ func (ss *Session) tryToPark(carID string) {
 	if err != nil {
 		return
 	}
+
 	ss.mu.Lock()
 	if !ss.isRunning() {
 		return
 	}
+
+	ss.log.Debug("trying to park car", "car_id", carID)
 
 	car, ok := ss.car[carID]
 	if !ok {
@@ -130,6 +135,7 @@ func (ss *Session) sendParkEvent(carID string) {
 
 	car, ok := ss.car[carID]
 	if !ok || car == nil {
+		ss.log.Debug("car not found in session", "car_id", carID)
 		ss.mu.Unlock()
 		return
 	}
@@ -147,8 +153,11 @@ func (ss *Session) sendParkEvent(carID string) {
 
 	data, err := json.Marshal(event)
 	if err != nil {
+		ss.log.Debug("error while marshaling park event", "car_id", carID, "error", err)
 		return
 	}
+
+	ss.log.Debug("car parked", "car_id", carID, "time", ss.timer.elapsedTime, "spot", car.Spot)
 
 	ss.client.Send(data)
 
@@ -173,8 +182,11 @@ func (ss *Session) droveAwayCar(carID string) {
 
 	data, err := json.Marshal(event)
 	if err != nil {
+		ss.log.Debug("error while marshaling drove-away event", "car_id", carID, "error", err)
 		return
 	}
+
+	ss.log.Debug("car drove away", "car_id", carID, "time", ss.timer.elapsedTime)
 
 	ss.client.Send(data)
 }
@@ -194,6 +206,7 @@ func (ss *Session) scheduleLeave(carID string, spot *models.ParkingPoint) {
 		ss.mu.Lock()
 
 		if !ss.isRunning() || ss.ctx.Err() != nil {
+			ss.log.Debug("session stopped or context cancelled, stop leaving car", "car_id", carID)
 			ss.mu.Unlock()
 			return
 		}
@@ -232,6 +245,7 @@ func (ss *Session) sendLeaveParkEvent(carID string) {
 	if err != nil {
 		return
 	}
+	ss.log.Debug("car left parking", "car_id", carID, "time", ss.timer.elapsedTime, "price", car.Price, "spot", car.Spot)
 
 	ss.client.Send(data)
 }

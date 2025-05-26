@@ -3,11 +3,16 @@ package parking_test
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/PIRSON21/parking/internal/config"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking"
 	"github.com/PIRSON21/parking/internal/http-server/handler/parking/mocks"
 	authMiddleware "github.com/PIRSON21/parking/internal/lib/api/auth/middleware"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
+	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	"github.com/PIRSON21/parking/internal/lib/logger/handlers/slogdiscard"
 	"github.com/PIRSON21/parking/internal/lib/test"
 	"github.com/PIRSON21/parking/internal/models"
@@ -15,9 +20,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"net/http/httptest"
-	"testing"
+	"golang.org/x/xerrors"
 )
 
 const (
@@ -47,8 +50,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 			},
 			GetParkingsError: nil,
@@ -77,8 +80,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 			},
 			UserID:           1,
@@ -108,8 +111,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 				{
 					ID:          2,
@@ -117,8 +120,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       4,
 					Height:      4,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 			},
 			GetParkingsError: nil,
@@ -156,8 +159,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 					Cells: [][]models.ParkingCell{
 						{
 							".", ".", ".",
@@ -176,8 +179,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       4,
 					Height:      4,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 					Cells: [][]models.ParkingCell{
 						{
 							".", ".", ".",
@@ -247,8 +250,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 					Cells: [][]models.ParkingCell{
 						{
 							".", ".", ".",
@@ -267,8 +270,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       4,
 					Height:      4,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 					Cells: [][]models.ParkingCell{
 						{
 							".", ".", ".",
@@ -338,8 +341,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 				{
 					ID:          2,
@@ -347,8 +350,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       4,
 					Height:      4,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 			},
 			UserID:           1,
@@ -387,8 +390,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 			},
 			GetParkingsError: nil,
@@ -417,8 +420,8 @@ func TestAllParkingsHandler(t *testing.T) {
 					Address:     "ул. Пушкина, д. Колотушкина",
 					Width:       5,
 					Height:      5,
-					DayTariff:   5,
-					NightTariff: 1,
+					DayTariff:   test.NewInt(5),
+					NightTariff: test.NewInt(1),
 				},
 			},
 			UserID:           1,
@@ -461,7 +464,7 @@ func TestAllParkingsHandler(t *testing.T) {
 			Name:             "Error while getting parks on dev",
 			Search:           "",
 			ParkingsList:     nil,
-			GetParkingsError: fmt.Errorf("parking getter error"),
+			GetParkingsError: xerrors.Errorf("parking getter error"),
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusInternalServerError,
 			ResponseBody:     fmt.Sprintf(test.ExpectedError, "parking getter error"),
@@ -472,7 +475,7 @@ func TestAllParkingsHandler(t *testing.T) {
 			Name:             "Error while getting parks on prod",
 			Search:           "",
 			ParkingsList:     nil,
-			GetParkingsError: fmt.Errorf("parking getter error"),
+			GetParkingsError: xerrors.Errorf("parking getter error"),
 			RequestURL:       urlAllParkings,
 			ResponseCode:     http.StatusInternalServerError,
 			ResponseBody:     test.InternalServerErrorMessage,
@@ -519,7 +522,6 @@ func TestAllParkingsHandler(t *testing.T) {
 
 				return
 			}
-
 		})
 	}
 }
@@ -538,7 +540,6 @@ const (
 //
 //goland:noinspection t
 func TestGetParkingHandler(t *testing.T) {
-
 	cases := []struct {
 		// Name - название теста. Нужен только для отображения
 		Name string
@@ -564,11 +565,13 @@ func TestGetParkingHandler(t *testing.T) {
 		{
 			Name: "Success With Cells",
 			Parking: &models.Parking{
-				ID:      1,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
+				ID:          1,
+				Name:        "1: Центр",
+				Address:     "ул. Пушкина, д. Колотушкина",
+				Width:       4,
+				Height:      4,
+				DayTariff:   test.NewInt(0),
+				NightTariff: test.NewInt(0),
 				Cells: [][]models.ParkingCell{
 					{
 						"P", "P", "P", "P",
@@ -588,11 +591,13 @@ func TestGetParkingHandler(t *testing.T) {
 			GetParkingError: nil,
 			GetCellsError:   nil,
 			ResponseBody: test.MustMarshalResponse(&models.Parking{
-				ID:      1,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
+				ID:          1,
+				Name:        "1: Центр",
+				Address:     "ул. Пушкина, д. Колотушкина",
+				Width:       4,
+				Height:      4,
+				DayTariff:   test.NewInt(0),
+				NightTariff: test.NewInt(0),
 				Cells: [][]models.ParkingCell{
 					{
 						"P", "P", "P", "P",
@@ -613,12 +618,14 @@ func TestGetParkingHandler(t *testing.T) {
 		{
 			Name: "Success without cells",
 			Parking: &models.Parking{
-				ID:      2,
-				Name:    "1: Центр",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Width:   4,
-				Height:  4,
-				Cells:   nil,
+				ID:          2,
+				Name:        "1: Центр",
+				Address:     "ул. Пушкина, д. Колотушкина",
+				Width:       4,
+				Height:      4,
+				DayTariff:   test.NewInt(0),
+				NightTariff: test.NewInt(0),
+				Cells:       nil,
 			},
 			ResponseCode:    http.StatusOK,
 			GetParkingError: nil,
@@ -629,8 +636,8 @@ func TestGetParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       4,
 				Height:      4,
-				DayTariff:   0,
-				NightTariff: 0,
+				DayTariff:   test.NewInt(0),
+				NightTariff: test.NewInt(0),
 				Cells:       nil,
 			}),
 			JSON: true,
@@ -646,7 +653,7 @@ func TestGetParkingHandler(t *testing.T) {
 				Cells:   nil,
 			},
 			ResponseCode:    http.StatusInternalServerError,
-			GetParkingError: fmt.Errorf("db: error getting from DB"),
+			GetParkingError: xerrors.Errorf("db: error getting from DB"),
 			GetCellsError:   nil,
 			ResponseBody:    fmt.Sprintf(test.ExpectedError, "db: error getting from DB"),
 			JSON:            true,
@@ -659,12 +666,12 @@ func TestGetParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       4,
 				Height:      4,
-				DayTariff:   0,
-				NightTariff: 0,
+				DayTariff:   test.NewInt(0),
+				NightTariff: test.NewInt(0),
 				Cells:       nil,
 			},
 			ResponseCode:    http.StatusInternalServerError,
-			GetParkingError: fmt.Errorf("db: error getting from DB"),
+			GetParkingError: xerrors.Errorf("db: error getting from DB"),
 			GetCellsError:   nil,
 			Environment:     test.EnvProd,
 			ResponseBody:    test.InternalServerErrorMessage,
@@ -674,7 +681,7 @@ func TestGetParkingHandler(t *testing.T) {
 			Name:            "Success not found",
 			Parking:         nil,
 			ResponseCode:    http.StatusNotFound,
-			GetParkingError: nil,
+			GetParkingError: custErr.ErrParkingNotFound,
 			GetCellsError:   nil,
 			ResponseBody:    test.NotFound,
 			JSON:            false,
@@ -687,8 +694,8 @@ func TestGetParkingHandler(t *testing.T) {
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       4,
 				Height:      4,
-				DayTariff:   1,
-				NightTariff: 2,
+				DayTariff:   test.NewInt(1),
+				NightTariff: test.NewInt(2),
 				Cells:       nil,
 				Manager:     &models.Manager{ID: 1},
 			},
@@ -701,8 +708,8 @@ func TestGetParkingHandler(t *testing.T) {
 				Name:        "1: Центр",
 				Address:     "ул. Пушкина, д. Колотушкина",
 				Width:       4,
-				DayTariff:   1,
-				NightTariff: 2,
+				DayTariff:   test.NewInt(1),
+				NightTariff: test.NewInt(2),
 				Height:      4,
 				Cells:       nil,
 				Manager:     &models.Manager{ID: 1},
@@ -715,7 +722,6 @@ func TestGetParkingHandler(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-
 			parkingGetterMock := mocks.NewParkingGetter(t)
 			if tc.Parking != nil {
 				// Если нужны данные парковки
@@ -733,8 +739,7 @@ func TestGetParkingHandler(t *testing.T) {
 			requestURL := fmt.Sprintf(urlCurrentParking, tc.Parking.ID)
 
 			ctx := context.WithValue(context.Background(), authMiddleware.UserIDKey, tc.UserID)
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
-			require.NoError(t, err)
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 
 			log := slogdiscard.NewDiscardLogger()
 			cfg := &config.Config{Environment: test.EnvLocal}

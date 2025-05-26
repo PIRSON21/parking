@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ type EventSender interface {
 
 // Session описывает сессию пользователя.
 type Session struct {
+	log        *slog.Logger
 	mu         sync.Mutex
 	state      string // "running", "paused", "stopped"
 	ctx        context.Context
@@ -67,7 +69,7 @@ const (
 	stateStopped = "stopped"
 )
 
-func NewSession(client EventSender, parking *models.Parking, startTime time.Time, arrivalCfg *ArrivalConfig, parkingCfg *ParkingTimeConfig) *Session {
+func NewSession(client EventSender, parking *models.Parking, startTime time.Time, arrivalCfg *ArrivalConfig, parkingCfg *ParkingTimeConfig, log *slog.Logger) *Session {
 	ctx, cancel := context.WithCancel(context.Background())
 	parkingLot := models.NewParkingLot(parking)
 	sem := semaphore.NewWeighted(20)
@@ -77,6 +79,7 @@ func NewSession(client EventSender, parking *models.Parking, startTime time.Time
 	}
 
 	return &Session{
+		log:     log,
 		state:   stateStopped,
 		ctx:     ctx,
 		cancel:  cancel,
@@ -97,6 +100,7 @@ func NewSession(client EventSender, parking *models.Parking, startTime time.Time
 func (ss *Session) Start() {
 	ss.mu.Lock()
 	if ss.state != statePaused && ss.state != stateStopped {
+		ss.log.Error("session already running or stopped")
 		ss.mu.Unlock()
 		return
 	}
@@ -105,6 +109,7 @@ func (ss *Session) Start() {
 
 	ss.mu.Unlock()
 	go ss.scheduleCar()
+	ss.log.Info("session started", slog.String("state", ss.state))
 }
 
 func (ss *Session) Pause() {
@@ -120,6 +125,7 @@ func (ss *Session) Pause() {
 	ss.state = statePaused
 
 	ss.timer.ticker.Stop()
+	ss.log.Info("session paused", slog.String("state", ss.state))
 }
 
 func (ss *Session) Resume() {
@@ -143,6 +149,7 @@ func (ss *Session) Resume() {
 	ss.mu.Unlock()
 
 	go ss.scheduleCar()
+	ss.log.Info("session resumed", slog.String("state", ss.state))
 }
 
 func (ss *Session) Stop() {
@@ -159,6 +166,7 @@ func (ss *Session) Stop() {
 		}
 	}
 	ss.mu.Unlock()
+	ss.log.Info("session stopped", slog.String("state", ss.state))
 }
 
 func (ss *Session) CheckPark(msg string) {

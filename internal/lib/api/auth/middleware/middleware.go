@@ -3,8 +3,12 @@ package middleware
 import (
 	"context"
 	"errors"
-	custErr "github.com/PIRSON21/parking/internal/lib/errors"
+	"log/slog"
 	"net/http"
+
+	resp "github.com/PIRSON21/parking/internal/lib/api/response"
+	custErr "github.com/PIRSON21/parking/internal/lib/errors"
+	"github.com/go-chi/render"
 )
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.0 --name=AuthGetter
@@ -19,7 +23,7 @@ type contextKey string
 var UserIDKey contextKey = "userID"
 
 // AuthMiddleware проверяет session_id из cookie клиента на актуальность и достоверность.
-func AuthMiddleware(storage AuthGetter) func(http.Handler) http.Handler {
+func AuthMiddleware(log *slog.Logger, storage AuthGetter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// читаем session_id из cookie
@@ -28,10 +32,12 @@ func AuthMiddleware(storage AuthGetter) func(http.Handler) http.Handler {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
+			log.Debug("auth middleware", slog.String("session_id", cookie.Value))
 
 			// проверяем сессию в БД
 			userID, err := storage.GetUserID(cookie.Value)
 			if err != nil {
+				log.Error("error while getting userID from storage", slog.String("session_id", cookie.Value), slog.String("err", err.Error()))
 				if errors.Is(err, custErr.ErrUnauthorized) {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
@@ -46,6 +52,7 @@ func AuthMiddleware(storage AuthGetter) func(http.Handler) http.Handler {
 
 			// добавляем userID в контекст
 			ctx := context.WithValue(r.Context(), UserIDKey, userID)
+			log.Debug("userID added to context", slog.Int("userID", userID))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -56,7 +63,8 @@ func AdminMiddleware(next http.Handler) http.Handler {
 		userIDVal := r.Context().Value(UserIDKey)
 		if userID, ok := userIDVal.(int); ok {
 			if userID != 0 {
-				http.Error(w, "Access denied", http.StatusForbidden)
+				render.Status(r, http.StatusForbidden)
+				render.JSON(w, r, resp.UnknownError("Access denied"))
 				return
 			}
 
@@ -65,7 +73,8 @@ func AdminMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		render.Status(r, http.StatusUnauthorized)
+		render.JSON(w, r, resp.UnknownError("Unauthorized"))
 	})
 }
 
@@ -74,7 +83,8 @@ func ManagerMiddleware(next http.Handler) http.Handler {
 		userIDVal := r.Context().Value(UserIDKey)
 		if userID, ok := userIDVal.(int); ok {
 			if userID == 0 {
-				http.Error(w, "Access denied", http.StatusForbidden)
+				render.Status(r, http.StatusForbidden)
+				render.JSON(w, r, resp.UnknownError("Access denied"))
 				return
 			}
 
@@ -83,6 +93,7 @@ func ManagerMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		render.Status(r, http.StatusUnauthorized)
+		render.JSON(w, r, resp.UnknownError("Unauthorized"))
 	})
 }

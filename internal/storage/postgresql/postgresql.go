@@ -17,6 +17,7 @@ import (
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/xerrors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -77,7 +78,7 @@ func (s *Storage) fetchParkings(query string, args ...interface{}) ([]*models.Pa
 
 	stmt, err := s.db.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("%s: error while prepare statement: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while prepare statement: %w", op, err)
 	}
 
 	rows, err := stmt.Query(args...)
@@ -85,7 +86,7 @@ func (s *Storage) fetchParkings(query string, args ...interface{}) ([]*models.Pa
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("%s: error while getting result: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while getting result: %w", op, err)
 	}
 	defer rows.Close()
 
@@ -108,7 +109,7 @@ func (s *Storage) fetchParkings(query string, args ...interface{}) ([]*models.Pa
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("%s: error while scanning rows: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while scanning rows: %w", op, err)
 	}
 
 	return resParking, nil
@@ -127,7 +128,7 @@ func (s *Storage) AddParking(parking *models.Parking) error {
 	`)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	topology, err := json.Marshal(&parking.Cells)
@@ -144,7 +145,7 @@ func (s *Storage) AddParking(parking *models.Parking) error {
 	err = stmt.QueryRow(&parking.Name, &parking.Address, &parking.Width, &parking.Height, &parking.DayTariff, &parking.NightTariff, &topology, &managerID).Scan(&parking.ID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 	return tx.Commit()
 }
@@ -162,7 +163,7 @@ func (s *Storage) GetParkingByID(parkingID int, userID int) (*models.Parking, er
 	WHERE parking_id = $1;
 	`)
 	if err != nil {
-		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	var topology string
@@ -170,24 +171,26 @@ func (s *Storage) GetParkingByID(parkingID int, userID int) (*models.Parking, er
 	var managerID sql.NullInt64
 	if err = stmt.QueryRow(parkingID).Scan(&parking.ID, &parking.Name, &parking.Address, &parking.Width, &parking.Height, &managerID, &parking.DayTariff, &parking.NightTariff, &topology); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, custErr.ErrParkingNotFound
 		}
 
-		return nil, fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	if err = json.Unmarshal([]byte(topology), &parking.Cells); err != nil {
-		return nil, fmt.Errorf("%s: error while unmarshalling parking topology: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while unmarshalling parking topology: %w", op, err)
 	}
 
 	if managerID.Valid {
 		manID := int(managerID.Int64)
 		if userID != 0 && manID != userID {
-			return nil, nil
+			return nil, custErr.ErrParkingAccessDenied
 		}
 		if userID != manID {
 			parking.Manager = &models.Manager{ID: manID}
 		}
+	} else if userID != 0 {
+		return nil, custErr.ErrParkingAccessDenied
 	}
 
 	return &parking, nil
@@ -217,7 +220,7 @@ func (s *Storage) GetParkingCells(parking *models.Parking) error {
 		WHERE parking_id = $1;
 	`)
 	if err != nil {
-		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	rows, err := stmt.Query(parking.ID)
@@ -226,7 +229,7 @@ func (s *Storage) GetParkingCells(parking *models.Parking) error {
 			return nil
 		}
 
-		return fmt.Errorf("%s: error while getting result from DB: %w", op, err)
+		return xerrors.Errorf("%s: error while getting result from DB: %w", op, err)
 	}
 
 	defer rows.Close()
@@ -240,7 +243,7 @@ func (s *Storage) GetParkingCells(parking *models.Parking) error {
 		var cellType models.ParkingCell
 
 		if err = rows.Scan(&x, &y, &cellType); err != nil {
-			return fmt.Errorf("%s: error while scanning result to var: %w", op, err)
+			return xerrors.Errorf("%s: error while scanning result to var: %w", op, err)
 		}
 
 		if x < 0 || x >= height || y < 0 || y >= width {
@@ -250,7 +253,7 @@ func (s *Storage) GetParkingCells(parking *models.Parking) error {
 		parkingCells[y][x] = cellType
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("%s: error after scanning rows: %w", op, err)
+		return xerrors.Errorf("%s: error after scanning rows: %w", op, err)
 	}
 
 	if !found {
@@ -273,7 +276,7 @@ func (s *Storage) GetUserID(sessionID string) (int, error) {
 	WHERE session_id = $1 AND deadline > now();
 	`)
 	if err != nil {
-		return 0, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return 0, xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	var userID sql.NullInt64
@@ -285,7 +288,7 @@ func (s *Storage) GetUserID(sessionID string) (int, error) {
 			return 0, custErr.ErrUnauthorized
 		}
 
-		return 0, fmt.Errorf("%s: error while getting row: %w", op, err)
+		return 0, xerrors.Errorf("%s: error while getting row: %w", op, err)
 	}
 
 	if userID.Valid {
@@ -304,7 +307,7 @@ func (s *Storage) AuthenticateManager(user *models.User) (int, error) {
 
 	stmt, err := s.db.Prepare(`SELECT manager_id, manager_password FROM manager WHERE manager_email = $1;`)
 	if err != nil {
-		return 0, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return 0, xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	err = stmt.QueryRow(user.Email).Scan(&managerID, &hashedPassword)
@@ -312,7 +315,7 @@ func (s *Storage) AuthenticateManager(user *models.User) (int, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, custErr.ErrUnauthorized
 		}
-		return 0, fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return 0, xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	if !checkPassword(user.Password, hashedPassword) {
@@ -342,14 +345,14 @@ func (s *Storage) SetSessionID(userID int, sessionID string) error {
 	VALUES ($1, $2, $3);
 	`)
 	if err != nil {
-		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	deadline := time.Now().Add(72 * time.Hour)
 
 	_, err = stmt.Exec(sessionID, queryID, deadline)
 	if err != nil {
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	return nil
@@ -365,12 +368,12 @@ func (s *Storage) CreateNewManager(manager *request.UserCreate) error {
 	VALUES ($1, $2, $3);
 	`)
 	if err != nil {
-		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	hashedPassword, err := createPasswordHash(manager.Password)
 	if err != nil {
-		return fmt.Errorf("%s: error while creating password hash: %w", op, err)
+		return xerrors.Errorf("%s: error while creating password hash: %w", op, err)
 	}
 
 	_, err = stmt.Exec(manager.Login, hashedPassword, manager.Email)
@@ -382,7 +385,7 @@ func (s *Storage) CreateNewManager(manager *request.UserCreate) error {
 			}
 		}
 
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	return nil
@@ -404,7 +407,7 @@ func (s *Storage) GetManagers() ([]*models.User, error) {
 	SELECT manager_id, manager_login, manager_email
 	FROM manager `)
 	if err != nil {
-		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	rows, err := stmt.Query()
@@ -414,7 +417,7 @@ func (s *Storage) GetManagers() ([]*models.User, error) {
 			return nil, nil
 		}
 
-		return nil, fmt.Errorf("%s: error while getting rows: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while getting rows: %w", op, err)
 	}
 
 	var managers []*models.User
@@ -423,13 +426,13 @@ func (s *Storage) GetManagers() ([]*models.User, error) {
 		manager := new(models.User)
 		err = rows.Scan(&manager.ID, &manager.Login, &manager.Email)
 		if err != nil {
-			return nil, fmt.Errorf("%s: error while reading rows: %w", op, err)
+			return nil, xerrors.Errorf("%s: error while reading rows: %w", op, err)
 		}
 		managers = append(managers, manager)
 	}
 
 	if rows.Err() != nil {
-		return nil, fmt.Errorf("%s: error with rows: %w", op, err)
+		return nil, xerrors.Errorf("%s: error with rows: %w", op, err)
 	}
 
 	return managers, nil
@@ -444,16 +447,16 @@ func (s *Storage) GetManagerByID(managerID int) (*models.User, error) {
 	WHERE manager_id = $1
 	`)
 	if err != nil {
-		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	var manager models.User
 
 	if err := stmt.QueryRow(managerID).Scan(&manager.ID, &manager.Login, &manager.Email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, custErr.ErrManagerNotFound
 		}
-		return nil, fmt.Errorf("%s: error while reading rows: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while reading rows: %w", op, err)
 	}
 
 	return &manager, nil
@@ -484,7 +487,7 @@ func (s *Storage) UpdateManager(manager *user.UserPatch) error {
 		updates = append(updates, fmt.Sprintf("manager_password = $%d", argIdx))
 		hashedPassword, err := createPasswordHash(*manager.Password)
 		if err != nil {
-			return fmt.Errorf("%s: error while hashing password: %w", op, err)
+			return xerrors.Errorf("%s: error while hashing password: %w", op, err)
 		}
 		args = append(args, hashedPassword)
 		argIdx++
@@ -495,7 +498,7 @@ func (s *Storage) UpdateManager(manager *user.UserPatch) error {
 
 	_, err := s.db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	return nil
@@ -507,22 +510,22 @@ func (s *Storage) DeleteManager(managerID int) error {
 
 	stmt, err := s.db.Prepare(`DELETE FROM manager WHERE manager_id = $1`)
 	if err != nil {
-		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	_, err = stmt.Exec(managerID)
 	if err != nil {
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	stmt, err = s.db.Prepare(`DELETE FROM user_session WHERE user_id = $1`)
 	if err != nil {
-		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	_, err = stmt.Exec(managerID)
 	if err != nil {
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	return nil
@@ -536,12 +539,12 @@ func (s *Storage) DeleteParking(parkingID int) error {
 	DELETE FROM parkings WHERE parking_id = $1
 	`)
 	if err != nil {
-		return fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 	}
 
 	_, err = stmt.Exec(parkingID)
 	if err != nil {
-		return fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	return nil
@@ -553,7 +556,7 @@ func (s *Storage) UpdateParking(changes *parking.ParkingPatch, cellStruct []*mod
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		return nil, fmt.Errorf("%s: error while begining transaction: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while begining transaction: %w", op, err)
 	}
 
 	var updates []string
@@ -614,28 +617,28 @@ func (s *Storage) UpdateParking(changes *parking.ParkingPatch, cellStruct []*mod
 	stmt, err := s.db.Prepare(query)
 	if err != nil {
 		tx.Rollback()
-		return nil, fmt.Errorf("%s: error while preparing statement: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while preparing statement: %w", op, err)
 
 	}
 
 	_, err = stmt.Exec(args...)
 	if err != nil {
 		tx.Rollback()
-		return nil, fmt.Errorf("%s: error while executing statement: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 
 	if changes.Cells != nil {
 		err := s.updateParkingCells(changes, cellStruct)
 		if err != nil {
 			tx.Rollback()
-			return nil, fmt.Errorf("%s: error while updating parking cells: %w", op, err)
+			return nil, xerrors.Errorf("%s: error while updating parking cells: %w", op, err)
 		}
 	}
 
 	parking, err := s.GetParkingByID(changes.ID, 0)
 	if err != nil {
 		tx.Rollback()
-		return nil, fmt.Errorf("%s: error while getting parking: %w", op, err)
+		return nil, xerrors.Errorf("%s: error while getting parking: %w", op, err)
 	}
 
 	err = tx.Commit()
@@ -647,12 +650,12 @@ func (s *Storage) updateParkingCells(changes *parking.ParkingPatch, cellStruct [
 
 	stmt, err := s.db.Prepare(`DELETE FROM parking_cell WHERE parking_id = $1`)
 	if err != nil {
-		return fmt.Errorf("%s: error while preparing \"delete parking cells\" statement: %w", op, err)
+		return xerrors.Errorf("%s: error while preparing \"delete parking cells\" statement: %w", op, err)
 	}
 
 	_, err = stmt.Exec(changes.ID)
 	if err != nil {
-		return fmt.Errorf("%s: error while executing \"delete parking cells\" statement: %w", op, err)
+		return xerrors.Errorf("%s: error while executing \"delete parking cells\" statement: %w", op, err)
 	}
 
 	return nil

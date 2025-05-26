@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
+	"golang.org/x/xerrors"
 )
 
 var invalidParkingIndex = errors.New("invalid parkingID syntax")
@@ -45,72 +46,48 @@ func AddParkingHandler(log *slog.Logger, storage ParkingSetter, cfg *config.Conf
 		err := render.DecodeJSON(r.Body, &parking)
 		if err != nil {
 			log.Error("error while decoding JSON", slog.String("err", err.Error()))
-
-			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while decoding JSON: %w", op, err))
-
+			resp.ErrorHandler(w, r, cfg, xerrors.Errorf("%s: error while decoding JSON: %w", op, err))
 			return
 		}
+		log.Debug("parking from request", slog.Any("parking", parking))
 
 		valid := customValidator.CreateNewValidator()
 
 		// валидируем данные
 		if err = valid.Struct(&parking); err != nil {
+			log.Error("validation error", slog.String("err", err.Error()))
 			var validateErr validator.ValidationErrors
 			errors.As(err, &validateErr)
-
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.ValidationError(validateErr))
-
 			return
 		}
 
+		log.Debug("parking validated", slog.Any("parking", parking))
+
 		if parking.Cells != nil {
-			errs := validateParkingCells(&parking)
+			log.Debug("validating parking cells")
+			errs := customValidator.ValidateParkingCells(&parking)
 			if errs != nil {
+				log.Error("error while validating parking cells", slog.Any("errors", errs))
 				render.Status(r, http.StatusBadRequest)
 				render.JSON(w, r, resp.ListError("cells", errs))
-
 				return
 			}
 		}
 
+		log.Debug("adding parking to DB")
 		// добавляем данные в БД
 		err = storage.AddParking(&parking)
 		if err != nil {
 			log.Error("error while adding Parking to DB", slog.String("err", err.Error()))
-			resp.ErrorHandler(w, r, cfg, fmt.Errorf("%s: error while saving Parking: %w", op, err))
+			resp.ErrorHandler(w, r, cfg, xerrors.Errorf("%s: error while saving Parking: %w", op, err))
 			return
 		}
 
+		log.Debug("parking added to DB", slog.Int("parkingID", parking.ID), slog.String("name", parking.Name))
 		w.WriteHeader(http.StatusCreated)
 	}
-}
-
-// validateParkingCells проверяет клетки парковки на соответствие требованиям.
-// Возвращает список всех найденных ошибок
-func validateParkingCells(parking *models.Parking) []error {
-	var errors []error
-	if len(parking.Cells) != parking.Height {
-		errors = append(errors, fmt.Errorf("длина парковки не соответствует длине топологии: %d", parking.Height))
-	}
-
-	for i, width := range parking.Cells {
-		if len(width) != parking.Width {
-			errors = append(errors, fmt.Errorf("ширина строки %d не соответствует ширине топологии: %d", i, parking.Width))
-		}
-
-		for j, cell := range width {
-			if !cell.IsParkingCell() {
-				errors = append(errors, fmt.Errorf("клетка (%d,%d) недействительна: '%s'", j, i, cell))
-			}
-		}
-	}
-
-	if len(errors) != 0 {
-		return errors
-	}
-
-	return nil
 }
 
 // DeleteParkingHandler удаляет парковку.
@@ -130,6 +107,7 @@ func DeleteParkingHandler(log *slog.Logger, db ParkingSetter, cfg *config.Config
 			render.JSON(w, r, resp.UnknownError("invalid parkingID syntax"))
 			return
 		}
+		log.Debug("parkingID from url", slog.Int("parkingID", parkingID))
 
 		err = db.DeleteParking(parkingID)
 		if err != nil {
@@ -138,6 +116,7 @@ func DeleteParkingHandler(log *slog.Logger, db ParkingSetter, cfg *config.Config
 			return
 		}
 
+		log.Debug("parking deleted", slog.Int("parkingID", parkingID))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -161,7 +140,7 @@ func UpdateParkingHandler(log *slog.Logger, db ParkingSetter, cfg *config.Config
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handler.parking.post.UpdateParkingHandler"
 
-		log := log.With(
+		log = log.With(
 			slog.String("op", op),
 			slog.String("reqID", middleware.GetReqID(r.Context())),
 		)
@@ -173,24 +152,31 @@ func UpdateParkingHandler(log *slog.Logger, db ParkingSetter, cfg *config.Config
 			render.JSON(w, r, resp.UnknownError(invalidParkingIndex.Error()))
 			return
 		}
+		log.Debug("parkingID from url", slog.Int("parkingID", parkingID))
 
 		var parkingUpdates ParkingPatch
 		err = render.DecodeJSON(r.Body, &parkingUpdates)
 		if err != nil {
+			render.Status(r, http.StatusBadRequest)
 			log.Error("error while decoding JSON", slog.String("err", err.Error()))
-			resp.ErrorHandler(w, r, cfg, err)
+			render.JSON(w, r, resp.UnknownError(fmt.Sprintf("error while decoding JSON: %s", err.Error())))
 			return
 		}
+		log.Debug("parkingUpdates from request", slog.Any("parkingUpdates", parkingUpdates))
 		parkingUpdates.ID = parkingID
 
 		valid := customValidator.CreateNewValidator()
-		if err := valid.Struct(&parkingUpdates); err != nil {
+		if err = valid.Struct(&parkingUpdates); err != nil {
 			var valErr validator.ValidationErrors
 			if errors.As(err, &valErr) {
+				log.Error("validation error", slog.String("err", err.Error()))
 				render.Status(r, http.StatusBadRequest)
 				render.JSON(w, r, resp.ValidationError(valErr))
 				return
 			}
+			log.Error("error while validating parking updates", slog.String("err", err.Error()))
+			resp.ErrorHandler(w, r, cfg, err)
+			return
 		}
 
 		var cellStruct []*models.ParkingCellStruct
@@ -202,21 +188,23 @@ func UpdateParkingHandler(log *slog.Logger, db ParkingSetter, cfg *config.Config
 				Height: *parkingUpdates.Height,
 				Cells:  parkingUpdates.Cells,
 			}
-			errs = validateParkingCells(&parking)
+			errs = customValidator.ValidateParkingCells(&parking)
 			if errs != nil {
+				log.Error("error while validating parking cells", slog.Any("errors", errs))
 				render.Status(r, http.StatusBadRequest)
 				render.JSON(w, r, resp.ListError("cells", errs))
-
 				return
 			}
 		}
 
+		log.Debug("updating parkings")
 		parking, err := db.UpdateParking(&parkingUpdates, cellStruct)
 		if err != nil {
 			log.Error("error while updating parking", slog.String("err", err.Error()))
 			resp.ErrorHandler(w, r, cfg, err)
 			return
 		}
+		log.Debug("parking updated", slog.Int("parkingID", parking.ID), slog.String("name", parking.Name))
 
 		render.JSON(w, r, parking)
 	}

@@ -19,6 +19,10 @@ func MustMarshalResponse(v interface{}) string {
 	return string(res)
 }
 
+func NewInt(v int) *int {
+	return &v
+}
+
 const (
 	EnvLocal = "local"
 	EnvDev   = "dev"
