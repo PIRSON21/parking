@@ -31,6 +31,7 @@ type Session struct {
 	sem        *semaphore.Weighted
 	arrivalCfg *ArrivalConfig
 	parkingCfg *ParkingTimeConfig
+	eventChan  chan CarEvent
 	pauseCh    chan struct{}
 }
 
@@ -93,6 +94,7 @@ func NewSession(client EventSender, parking *models.Parking, startTime time.Time
 		},
 		sem:        sem,
 		arrivalCfg: arrivalCfg,
+		eventChan:  make(chan CarEvent, 100),
 		parkingCfg: parkingCfg,
 	}
 }
@@ -106,6 +108,7 @@ func (ss *Session) Start() {
 	}
 	ss.state = stateRunning
 	go ss.startTimer()
+	go ss.eventLoop()
 
 	ss.mu.Unlock()
 	go ss.scheduleCar()
