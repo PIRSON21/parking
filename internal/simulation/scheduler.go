@@ -202,9 +202,9 @@ func (ss *Session) scheduleLeave(carID string, spot *models.ParkingPoint) {
 		car.Price = ss.calculateParkingCost(ss.timer.elapsedTime, car.EnterTime)
 
 		ss.parking.ReleaseSpot(spot)
-		ss.mu.Unlock()
 
 		ss.sendLeaveParkEvent(carID)
+		ss.mu.Unlock()
 	})
 
 	car.Timer = time
@@ -214,9 +214,7 @@ func (ss *Session) scheduleLeave(carID string, spot *models.ParkingPoint) {
 
 // sendLeaveParkEvent отправляет событие о выезде автомобиля с парковки.
 func (ss *Session) sendLeaveParkEvent(carID string) {
-	ss.mu.Lock()
 	car := ss.car[carID]
-	ss.mu.Unlock()
 
 	event := CarEvent{
 		Event:     "leave",
