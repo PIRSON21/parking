@@ -66,7 +66,7 @@ func (c *Client) WriteLoop(log *slog.Logger) {
 		close(c.Done)
 	})
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -92,7 +92,6 @@ func (c *Client) WriteLoop(log *slog.Logger) {
 				return
 			}
 		}
-
 	}
 }
 

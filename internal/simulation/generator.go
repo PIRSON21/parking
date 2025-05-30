@@ -1,6 +1,7 @@
 package simulation
 
 import (
+	"fmt"
 	"math"
 	"math/rand/v2"
 	"time"
@@ -73,6 +74,7 @@ func (ss *Session) generateLeaveDelay() time.Duration {
 // calculateParkingCost вычисляет стоимость стоянки.
 func (ss *Session) calculateParkingCost(now time.Time, entered time.Time) float64 {
 	totalCost := 0.0
+	fmt.Println(entered, now)
 
 	for entered.Before(now) {
 		nextBoundary := getNextBoundary(entered)

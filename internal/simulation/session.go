@@ -198,6 +198,7 @@ func (ss *Session) startTimer() {
 			ss.mu.Lock()
 			if ss.state == stateRunning {
 				ss.timer.elapsedTime = ss.timer.elapsedTime.Add(1 * time.Minute)
+				slog.Info("timer ticked", slog.Time("elapsed_time", ss.timer.elapsedTime))
 			}
 			ss.mu.Unlock()
 		case <-ss.ctx.Done():

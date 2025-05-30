@@ -23,7 +23,9 @@ RUN go build -o /app/parking ./cmd/parking/main.go
 FROM alpine:3.21 AS copy
 LABEL stage=copy
 
-RUN apk update --no-cache && apk add --no-cache ca-certificates
+RUN apk update --no-cache && apk add --no-cache ca-certificates tzdata
+ENV TZ=Europe/Samara
+
 
 WORKDIR /app
 
