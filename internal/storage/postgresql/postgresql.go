@@ -145,6 +145,12 @@ func (s *Storage) AddParking(parking *models.Parking) error {
 	err = stmt.QueryRow(&parking.Name, &parking.Address, &parking.Width, &parking.Height, &parking.DayTariff, &parking.NightTariff, &topology, &managerID).Scan(&parking.ID)
 	if err != nil {
 		tx.Rollback()
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				return custErr.ErrParkingAlreadyExists
+			}
+		}
 		return xerrors.Errorf("%s: error while executing statement: %w", op, err)
 	}
 	return tx.Commit()

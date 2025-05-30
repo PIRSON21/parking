@@ -7,3 +7,4 @@ CREATE TABLE IF NOT EXISTS parkings (
 );
 
 CREATE INDEX idx_parkings_parking_name ON parkings(parking_name);
+CREATE UNIQUE INDEX id_parkings_parking_name_parking_address ON parkings(parking_name, parking_address);

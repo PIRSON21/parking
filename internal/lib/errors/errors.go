@@ -13,3 +13,5 @@ var ErrManagerNotFound = errors.New("менеджер не найден")
 var ErrParkingNotFound = errors.New("парковка не найдена")
 
 var ErrParkingAccessDenied = errors.New("доступ к парковке запрещен")
+
+var ErrParkingAlreadyExists = errors.New("парковка с таким именем и адресом уже существует")

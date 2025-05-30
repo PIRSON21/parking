@@ -90,7 +90,7 @@ func ParkingTimeConfigStructLevelValidation(sl validator.StructLevel) {
 // Возвращает список всех найденных ошибок
 func ValidateParkingCells(parking *models.Parking) []error {
 	var errors []error
-	var countEnterance, countExit int
+	var countEnterance, countExit, countPark int
 
 	height := len(parking.Cells)
 	if height != parking.Height {
@@ -110,8 +110,20 @@ func ValidateParkingCells(parking *models.Parking) []error {
 				errors = append(errors, validateEnterance(&countEnterance, i, height, j)...)
 			} else if cell.IsExit() {
 				errors = append(errors, validateExit(&countExit, height, i, j)...)
+			} else if cell.IsParking() {
+				countPark++
 			}
 		}
+	}
+
+	if countEnterance == 0 {
+		errors = append(errors, xerrors.Errorf("в топологии парковки должна быть точка входа"))
+	}
+	if countExit == 0 {
+		errors = append(errors, xerrors.Errorf("в топологии парковки должна быть точка выхода"))
+	}
+	if countPark == 0 {
+		errors = append(errors, xerrors.Errorf("в топологии парковки должны быть парковочные места"))
 	}
 
 	if len(errors) != 0 {

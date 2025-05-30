@@ -9,6 +9,7 @@ import (
 
 	"github.com/PIRSON21/parking/internal/config"
 	resp "github.com/PIRSON21/parking/internal/lib/api/response"
+	custErr "github.com/PIRSON21/parking/internal/lib/errors"
 	customValidator "github.com/PIRSON21/parking/internal/lib/validator"
 	"github.com/PIRSON21/parking/internal/models"
 	"github.com/go-chi/chi/v5"
@@ -80,6 +81,12 @@ func AddParkingHandler(log *slog.Logger, storage ParkingSetter, cfg *config.Conf
 		// добавляем данные в БД
 		err = storage.AddParking(&parking)
 		if err != nil {
+			if errors.Is(err, custErr.ErrParkingAlreadyExists) {
+				log.Debug("parking already exists", slog.String("err", err.Error()))
+				render.Status(r, http.StatusConflict)
+				render.JSON(w, r, resp.UnknownError(err.Error()))
+				return
+			}
 			log.Error("error while adding Parking to DB", slog.String("err", err.Error()))
 			resp.ErrorHandler(w, r, cfg, xerrors.Errorf("%s: error while saving Parking: %w", op, err))
 			return
