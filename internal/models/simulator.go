@@ -151,7 +151,7 @@ func (p *ParkingLot) findNearestSpot(minDistance float64) *ParkingPoint {
 
 			// Если клетка не дорога, не выезд, и не парковочное место
 			cell := p.topology[nx][ny].cell
-			if (!cell.IsRoad() && !cell.IsExit() && !cell.IsParking()) || visited[nx][ny] {
+			if (!cell.IsRoad() && !cell.IsExit() && !(cell.IsParking() && p.topology[nx][ny].isFree)) || visited[nx][ny] {
 				// fmt.Printf("cell %s (%d, %d) is not road, exit or parking\n", cell, nx, ny)
 				continue
 			}
