@@ -1,0 +1,2 @@
+ALTER TABLE parkings ADD COLUMN IF NOT EXISTS manager_id INTEGER NULL;
+ALTER TABLE parkings ADD CONSTRAINT fk_manager FOREIGN KEY (manager_id) REFERENCES manager(manager_id) ON DELETE SET NULL;
